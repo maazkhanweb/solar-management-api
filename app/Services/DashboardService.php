@@ -387,18 +387,23 @@ class DashboardService
 
                 'bill' => [
 
-                    'id' => $bill->id,
+    'id' => $bill->id,
 
-                    'month' => $bill->bill_month,
+    'month' => $bill->bill_month,
 
-                    'year' => $bill->bill_year,
+    'year' => $bill->bill_year,
 
-                    'bill_amount' => round(
-                        $billAmount,
-                        2
-                    ),
+    'units_consumed' => round(
+        $unitsConsumed,
+        2
+    ),
 
-                ],
+    'bill_amount' => round(
+        $billAmount,
+        2
+    ),
+
+],
 
                 'analysis' => $analysisData,
 

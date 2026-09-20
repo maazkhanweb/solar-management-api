@@ -260,14 +260,13 @@ Route::middleware('auth:sanctum')->group(function () {
         [ReportController::class, 'preview']
     );
 
-    Route::post(
-        '/reports/export/csv/{module}',
-        [ReportController::class, 'exportCsv']
-    );
+ Route::get(
+    '/reports/export/csv/{module}',
+    [ReportController::class, 'exportCsv']
+);
 
-    Route::post(
-        '/reports/export/pdf/{module}',
-        [ReportController::class, 'exportPdf']
-    );
-
+Route::get(
+    '/reports/export/pdf/{module}',
+    [ReportController::class, 'exportPdf']
+);
 });

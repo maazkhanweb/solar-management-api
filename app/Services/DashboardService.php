@@ -8,6 +8,7 @@ use App\Models\InventoryItem;
 use App\Models\User;
 use App\Services\Analysis\BillAnalysisService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class DashboardService
@@ -68,6 +69,10 @@ class DashboardService
     {
         $user = Auth::user();
 
+        $statistics = $user->role === 'Administrator'
+            ? DB::selectOne('SELECT (SELECT COUNT(*) FROM users) AS total_users, (SELECT COUNT(*) FROM areas) AS total_areas, inventory_statistics.total_inventory_items, inventory_statistics.total_assigned_items, inventory_statistics.total_low_stock_items, (SELECT COUNT(*) FROM bills) AS total_wapda_bills FROM (SELECT COUNT(*) AS total_inventory_items, COALESCE(SUM(CASE WHEN assigned_quantity > 0 THEN 1 ELSE 0 END), 0) AS total_assigned_items, COALESCE(SUM(CASE WHEN available_quantity <= minimum_stock THEN 1 ELSE 0 END), 0) AS total_low_stock_items FROM inventory_items) AS inventory_statistics')
+            : DB::selectOne('SELECT (SELECT COUNT(*) FROM users WHERE area_id IS NOT DISTINCT FROM ?) AS total_users, 1 AS total_areas, inventory_statistics.total_inventory_items, inventory_statistics.total_assigned_items, inventory_statistics.total_low_stock_items, (SELECT COUNT(*) FROM bills WHERE created_by = ?) AS total_wapda_bills FROM (SELECT COUNT(*) AS total_inventory_items, COALESCE(SUM(CASE WHEN assigned_quantity > 0 THEN 1 ELSE 0 END), 0) AS total_assigned_items, COALESCE(SUM(CASE WHEN available_quantity <= minimum_stock THEN 1 ELSE 0 END), 0) AS total_low_stock_items FROM inventory_items WHERE area_id IS NOT DISTINCT FROM ?) AS inventory_statistics', [$user->area_id, $user->id, $user->area_id]);
+
 
         /*
         |--------------------------------------------------------------------------
@@ -80,30 +85,22 @@ class DashboardService
             return [
 
                 'totalUsers' =>
-                    User::count(),
+                    (int) $statistics->total_users,
 
                 'totalAreas' =>
-                    Area::count(),
+                    (int) $statistics->total_areas,
 
                 'totalInventoryItems' =>
-                    InventoryItem::count(),
+                    (int) $statistics->total_inventory_items,
 
                 'totalAssignedItems' =>
-                    InventoryItem::where(
-                        'assigned_quantity',
-                        '>',
-                        0
-                    )->count(),
+                    (int) $statistics->total_assigned_items,
 
                 'totalLowStockItems' =>
-                    InventoryItem::whereColumn(
-                        'available_quantity',
-                        '<=',
-                        'minimum_stock'
-                    )->count(),
+                    (int) $statistics->total_low_stock_items,
 
                 'totalWapdaBills' =>
-                    Bill::count(),
+                    (int) $statistics->total_wapda_bills,
 
                 'totalReports' =>
                     $this->reportService
@@ -125,10 +122,7 @@ class DashboardService
              * Users
              */
             'totalUsers' =>
-                User::where(
-                    'area_id',
-                    $user->area_id
-                )->count(),
+                (int) $statistics->total_users,
 
 
             /*
@@ -142,52 +136,28 @@ class DashboardService
              * Inventory
              */
             'totalInventoryItems' =>
-                InventoryItem::where(
-                    'area_id',
-                    $user->area_id
-                )->count(),
+                (int) $statistics->total_inventory_items,
 
 
             /*
              * Assigned Items
              */
             'totalAssignedItems' =>
-                InventoryItem::where(
-                    'area_id',
-                    $user->area_id
-                )
-                ->where(
-                    'assigned_quantity',
-                    '>',
-                    0
-                )
-                ->count(),
+                (int) $statistics->total_assigned_items,
 
 
             /*
              * Low Stock
              */
             'totalLowStockItems' =>
-                InventoryItem::where(
-                    'area_id',
-                    $user->area_id
-                )
-                ->whereColumn(
-                    'available_quantity',
-                    '<=',
-                    'minimum_stock'
-                )
-                ->count(),
+                (int) $statistics->total_low_stock_items,
 
 
             /*
              * Bills uploaded by Manager
              */
             'totalWapdaBills' =>
-                Bill::where(
-                    'created_by',
-                    $user->id
-                )->count(),
+                (int) $statistics->total_wapda_bills,
 
 
             /*
@@ -229,7 +199,20 @@ class DashboardService
         |--------------------------------------------------------------------------
         */
 
-        $billQuery = Bill::query();
+        $billQuery = Bill::query()
+            ->leftJoin('areas', 'bills.area_id', '=', 'areas.id')
+            ->select([
+                'bills.id',
+                'bills.area_id',
+                'bills.bill_month',
+                'bills.bill_year',
+                'bills.units_consumed',
+                'bills.generated_units',
+                'bills.bill_amount',
+                'areas.id as dashboard_area_id',
+                'areas.area_name as dashboard_area_name',
+                'areas.status as dashboard_area_status',
+            ]);
 
 
         /*
@@ -260,7 +243,7 @@ class DashboardService
         $bills = $billQuery
             ->orderByDesc('bill_year')
             ->orderByDesc('bill_month')
-            ->orderByDesc('id')
+            ->orderByDesc('bills.id')
             ->get();
 
 
@@ -415,10 +398,13 @@ class DashboardService
                 |--------------------------------------------------------------------------
                 */
 
-                $area =
-                    Area::find(
-                        $bill->area_id
-                    );
+                $area = $bill->dashboard_area_id === null
+                    ? null
+                    : (object) [
+                        'id' => (int) $bill->dashboard_area_id,
+                        'area_name' => $bill->dashboard_area_name,
+                        'status' => $bill->dashboard_area_status,
+                    ];
 
 
                 /*

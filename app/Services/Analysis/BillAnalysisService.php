@@ -36,11 +36,13 @@ class BillAnalysisService
         |
         | Negative:
         | Solar generated fewer units than consumed.
+        |
         */
 
         $differenceUnits =
             $generatedUnits -
             $unitsConsumed;
+
 
         /*
         |------------------------------------------------------------------
@@ -57,6 +59,7 @@ class BillAnalysisService
                 $unitsConsumed;
 
         }
+
 
         /*
         |------------------------------------------------------------------
@@ -76,6 +79,7 @@ class BillAnalysisService
 
         }
 
+
         /*
         |------------------------------------------------------------------
         | WAPDA Dependency
@@ -87,6 +91,7 @@ class BillAnalysisService
             100 - $coverage
         );
 
+
         /*
         |------------------------------------------------------------------
         | Estimated Saving
@@ -97,6 +102,7 @@ class BillAnalysisService
             $generatedUnits *
             $unitRate;
 
+
         /*
         |------------------------------------------------------------------
         | Efficiency
@@ -105,25 +111,31 @@ class BillAnalysisService
 
         if ($coverage >= 100) {
 
-            $efficiency = "Excellent";
+            $efficiency =
+                "Excellent";
 
         } elseif ($coverage >= 90) {
 
-            $efficiency = "Very Good";
+            $efficiency =
+                "Very Good";
 
         } elseif ($coverage >= 80) {
 
-            $efficiency = "Good";
+            $efficiency =
+                "Good";
 
         } elseif ($coverage >= 60) {
 
-            $efficiency = "Average";
+            $efficiency =
+                "Average";
 
         } else {
 
-            $efficiency = "Poor";
+            $efficiency =
+                "Poor";
 
         }
+
 
         /*
         |------------------------------------------------------------------
@@ -133,52 +145,61 @@ class BillAnalysisService
 
         return [
 
-            "success" => true,
+            "success" =>
+                true,
 
             "message" =>
                 "Bill analyzed successfully.",
 
             "analysis" => [
 
-                "units_consumed" => round(
-                    $unitsConsumed,
-                    2
-                ),
+                "units_consumed" =>
+                    round(
+                        $unitsConsumed,
+                        2
+                    ),
 
-                "generated_units" => round(
-                    $generatedUnits,
-                    2
-                ),
+                "generated_units" =>
+                    round(
+                        $generatedUnits,
+                        2
+                    ),
 
-                "difference_units" => round(
-                    $differenceUnits,
-                    2
-                ),
+                "difference_units" =>
+                    round(
+                        $differenceUnits,
+                        2
+                    ),
 
-                "bill_amount" => round(
-                    $billAmount,
-                    2
-                ),
+                "bill_amount" =>
+                    round(
+                        $billAmount,
+                        2
+                    ),
 
-                "unit_rate" => round(
-                    $unitRate,
-                    2
-                ),
+                "unit_rate" =>
+                    round(
+                        $unitRate,
+                        2
+                    ),
 
-                "solar_coverage" => round(
-                    $coverage,
-                    2
-                ),
+                "solar_coverage" =>
+                    round(
+                        $coverage,
+                        2
+                    ),
 
-                "wapda_dependency" => round(
-                    $dependency,
-                    2
-                ),
+                "wapda_dependency" =>
+                    round(
+                        $dependency,
+                        2
+                    ),
 
-                "estimated_saving" => round(
-                    $estimatedSaving,
-                    2
-                ),
+                "estimated_saving" =>
+                    round(
+                        $estimatedSaving,
+                        2
+                    ),
 
                 "efficiency" =>
                     $efficiency,

@@ -7,6 +7,7 @@ use App\Models\Bill;
 use App\Models\InventoryItem;
 use App\Models\InventoryTransaction;
 use App\Models\User;
+use App\Services\Analysis\BillAnalysisService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -14,7 +15,23 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ReportExportService
 {
     /**
+     * Bill Analysis Service
+     */
+    protected BillAnalysisService $billAnalysisService;
+
+    /**
+     * Constructor
+     */
+    public function __construct(
+        BillAnalysisService $billAnalysisService
+    ) {
+        $this->billAnalysisService = $billAnalysisService;
+    }
+
+    /**
+     * ==========================================================
      * Export CSV
+     * ==========================================================
      */
     public function exportCsv(string $module): StreamedResponse
     {
@@ -22,6 +39,11 @@ class ReportExportService
 
         switch ($module) {
 
+            /*
+            |--------------------------------------------------------------------------
+            | Users
+            |--------------------------------------------------------------------------
+            */
             case "users":
 
                 $fileName = "Users_Report.csv";
@@ -39,6 +61,11 @@ class ReportExportService
 
                 break;
 
+            /*
+            |--------------------------------------------------------------------------
+            | Areas
+            |--------------------------------------------------------------------------
+            */
             case "areas":
 
                 $fileName = "Areas_Report.csv";
@@ -57,6 +84,11 @@ class ReportExportService
 
                 break;
 
+            /*
+            |--------------------------------------------------------------------------
+            | Inventory
+            |--------------------------------------------------------------------------
+            */
             case "inventory":
 
                 $fileName = "Inventory_Report.csv";
@@ -76,6 +108,11 @@ class ReportExportService
 
                 break;
 
+            /*
+            |--------------------------------------------------------------------------
+            | Inventory Transactions
+            |--------------------------------------------------------------------------
+            */
             case "transactions":
 
                 $fileName = "Inventory_Transactions_Report.csv";
@@ -95,18 +132,32 @@ class ReportExportService
 
                 break;
 
+            /*
+            |--------------------------------------------------------------------------
+            | WAPDA Bills + Solar Analysis
+            |--------------------------------------------------------------------------
+            */
             case "bills":
 
-                $fileName = "Bills_Report.csv";
+                $fileName = "WAPDA_Bill_Analysis_Report.csv";
 
                 $headers = [
                     "ID",
-                    "Consumer",
-                    "Reference No",
-                    "Month",
-                    "Year",
-                    "Units",
+                    "Consumer Name",
+                    "Reference Number",
+                    "Area",
+                    "Bill Month",
+                    "Bill Year",
+                    "WAPDA Units",
+                    "Solar Generated Units",
+                    "Difference Units",
                     "Bill Amount",
+                
+                    "Solar Coverage",
+                
+                    "Estimated Saving",
+                    "Efficiency",
+                    "Generation Loss Reason",
                     "Status",
                     "Created At",
                 ];
@@ -115,48 +166,216 @@ class ReportExportService
 
                 break;
 
+            /*
+            |--------------------------------------------------------------------------
+            | Invalid Module
+            |--------------------------------------------------------------------------
+            */
             default:
 
-                abort(404, "Invalid Report Module.");
-
+                abort(
+                    404,
+                    "Invalid Report Module."
+                );
         }
 
         return response()->streamDownload(
 
-            function () use ($headers, $rows, $module) {
+            function () use (
+                $headers,
+                $rows,
+                $module
+            ) {
 
-                $handle = fopen("php://output", "w");
+                $handle = fopen(
+                    "php://output",
+                    "w"
+                );
 
-                fputcsv($handle, $headers);
+                /*
+                |--------------------------------------------------------------------------
+                | UTF-8 BOM
+                |--------------------------------------------------------------------------
+                */
+                fprintf(
+                    $handle,
+                    chr(0xEF) .
+                    chr(0xBB) .
+                    chr(0xBF)
+                );
 
+                /*
+                |--------------------------------------------------------------------------
+                | Headers
+                |--------------------------------------------------------------------------
+                */
+                fputcsv(
+                    $handle,
+                    $headers
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | Rows
+                |--------------------------------------------------------------------------
+                */
                 foreach ($rows as $row) {
 
                     switch ($module) {
 
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Transactions
+                        |--------------------------------------------------------------------------
+                        */
                         case "transactions":
 
-                            fputcsv($handle, [
+                            fputcsv(
+                                $handle,
+                                [
+                                    $row->id,
 
-                                $row->id,
+                                    $row->inventoryItem?->item_name,
 
-                                $row->inventoryItem?->item_name,
+                                    $row->transaction_type,
 
-                                $row->transaction_type,
+                                    $row->quantity,
 
-                                $row->quantity,
+                                    $row->fromArea?->area_name
+                                        ?? "Warehouse",
 
-                                $row->fromArea?->area_name ?? "Warehouse",
+                                    $row->toArea?->area_name
+                                        ?? "-",
 
-                                $row->toArea?->area_name ?? "-",
+                                    $row->user?->name
+                                        ?? "-",
 
-                                $row->user?->name ?? "-",
-
-                                $row->created_at,
-
-                            ]);
+                                    $row->created_at,
+                                ]
+                            );
 
                             break;
 
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Bills + Bill Analysis
+                        |--------------------------------------------------------------------------
+                        */
+                        case "bills":
+
+                            $analysisResult =
+                                $this->billAnalysisService->analyze(
+
+                                    (float) $row->units_consumed,
+
+                                    (float) $row->generated_units,
+
+                                    (float) $row->bill_amount,
+
+                                    $row->generation_loss_reason
+
+                                );
+
+                            $analysis =
+                                $analysisResult["analysis"];
+
+                            fputcsv(
+                                $handle,
+                                [
+                                    /*
+                                    | ID
+                                    */
+                                    $row->id,
+
+                                    /*
+                                    | Consumer Name
+                                    */
+                                    $row->consumer_name,
+
+                                    /*
+                                    | Reference Number
+                                    */
+                                    $row->reference_number,
+
+                                    /*
+                                    | Area
+                                    */
+                                    $row->area?->area_name
+                                        ?? "-",
+
+                                    /*
+                                    | Bill Month
+                                    */
+                                    $row->bill_month,
+
+                                    /*
+                                    | Bill Year
+                                    */
+                                    $row->bill_year,
+
+                                    /*
+                                    | WAPDA Units
+                                    */
+                                    $analysis["units_consumed"],
+
+                                    /*
+                                    | Solar Generated Units
+                                    */
+                                    $analysis["generated_units"],
+
+                                    /*
+                                    | Difference Units
+                                    */
+                                    $analysis["difference_units"],
+
+                                    /*
+                                    | Bill Amount
+                                    */
+                                    $analysis["bill_amount"],
+
+                                    
+                                    /*
+                                    | Solar Coverage
+                                    */
+                                    $analysis["solar_coverage"] . "%",
+
+                                    
+
+                                    /*
+                                    | Estimated Saving
+                                    */
+                                    $analysis["estimated_saving"],
+
+                                    /*
+                                    | Efficiency
+                                    */
+                                    $analysis["efficiency"],
+
+                                    /*
+                                    | Generation Loss Reason
+                                    */
+                                    $analysis["generation_loss_reason"]
+                                        ?? "-",
+
+                                    /*
+                                    | Status
+                                    */
+                                    $row->status,
+
+                                    /*
+                                    | Created At
+                                    */
+                                    $row->created_at,
+                                ]
+                            );
+
+                            break;
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Other Modules
+                        |--------------------------------------------------------------------------
+                        */
                         default:
 
                             fputcsv(
@@ -166,70 +385,18 @@ class ReportExportService
                                 )
                             );
 
+                            break;
                     }
-
                 }
 
                 fclose($handle);
-
             },
 
             $fileName,
 
             [
-
-                "Content-Type" => "text/csv",
-
-            ]
-
-        );
-
-    }
-
-    /**
-     * Export PDF
-     */
-    public function exportPdf(string $module)
-    {
-        $module = strtolower($module);
-
-        $title = $this->getModuleTitle($module);
-
-        $rows = $this->getModuleData($module);
-
-        $view = $this->getModuleView($module);
-
-        $html = view($view, [
-
-            "title" => $title,
-
-            "module" => ucfirst($module),
-
-            "rows" => $rows,
-
-            "generatedAt" => now(),
-
-            "user" => Auth::user(),
-
-        ])->render();
-
-        $pdf = Pdf::loadHTML($html);
-
-        $fileName = str_replace(
-            " ",
-            "_",
-            $title
-        ) . ".pdf";
-
-        return response(
-
-            $pdf->output(),
-
-            200,
-
-            [
-
-                "Content-Type" => "application/pdf",
+                "Content-Type" =>
+                    "text/csv; charset=UTF-8",
 
                 "Content-Disposition" =>
                     "attachment; filename=\"{$fileName}\"",
@@ -237,17 +404,112 @@ class ReportExportService
                 "Cache-Control" =>
                     "no-cache, no-store, must-revalidate",
 
-                "Pragma" => "no-cache",
+                "Pragma" =>
+                    "no-cache",
 
-                "Expires" => "0",
-
+                "Expires" =>
+                    "0",
             ]
 
         );
-
     }
-        /**
+
+    /**
+     * ==========================================================
+     * Export PDF
+     * ==========================================================
+     */
+    public function exportPdf(string $module)
+    {
+        $module = strtolower($module);
+
+        $title =
+            $this->getModuleTitle(
+                $module
+            );
+
+        $rows =
+            $this->getModuleData(
+                $module
+            );
+
+        $view =
+            $this->getModuleView(
+                $module
+            );
+
+        $html =
+            view(
+                $view,
+                [
+                    "title" =>
+                        $title,
+
+                    "module" =>
+                        ucfirst($module),
+
+                    "rows" =>
+                        $rows,
+
+                    "generatedAt" =>
+                        now(),
+
+                    "user" =>
+                        Auth::user(),
+                ]
+            )->render();
+
+        $pdf =
+            Pdf::loadHTML(
+                $html
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Landscape for Bills Report
+        |--------------------------------------------------------------------------
+        */
+        if ($module === "bills") {
+
+            $pdf->setPaper(
+                "a4",
+                "landscape"
+            );
+        }
+
+        $fileName =
+            str_replace(
+                " ",
+                "_",
+                $title
+            ) . ".pdf";
+
+        return response(
+            $pdf->output(),
+            200,
+            [
+                "Content-Type" =>
+                    "application/pdf",
+
+                "Content-Disposition" =>
+                    "attachment; filename=\"{$fileName}\"",
+
+                "Cache-Control" =>
+                    "no-cache, no-store, must-revalidate",
+
+                "Pragma" =>
+                    "no-cache",
+
+                "Expires" =>
+                    "0",
+            ]
+        );
+    }
+
+    /**
+     * ==========================================================
      * Users Data
+     * ==========================================================
      */
     public function getUsersData()
     {
@@ -263,9 +525,8 @@ class ReportExportService
                 "status",
                 "created_at"
             )
-            ->orderBy("id")
-            ->get();
-
+                ->orderBy("id")
+                ->get();
         }
 
         return User::select(
@@ -276,12 +537,17 @@ class ReportExportService
             "status",
             "created_at"
         )
-        ->where("id", $user->id)
-        ->get();
+            ->where(
+                "id",
+                $user->id
+            )
+            ->get();
     }
 
     /**
+     * ==========================================================
      * Areas Data
+     * ==========================================================
      */
     public function getAreasData()
     {
@@ -298,9 +564,8 @@ class ReportExportService
                 "status",
                 "created_at"
             )
-            ->orderBy("id")
-            ->get();
-
+                ->orderBy("id")
+                ->get();
         }
 
         return Area::select(
@@ -312,28 +577,34 @@ class ReportExportService
             "status",
             "created_at"
         )
-        ->where("id", $user->area_id)
-        ->get();
+            ->where(
+                "id",
+                $user->area_id
+            )
+            ->get();
     }
 
     /**
+     * ==========================================================
      * Inventory Data
+     * ==========================================================
      */
     public function getInventoryData()
     {
         $user = Auth::user();
 
-        $query = InventoryItem::select(
-            "id",
-            "item_name",
-            "item_type",
-            "quantity",
-            "available_quantity",
-            "minimum_stock",
-            "status",
-            "created_at",
-            "area_id"
-        );
+        $query =
+            InventoryItem::select(
+                "id",
+                "item_name",
+                "item_type",
+                "quantity",
+                "available_quantity",
+                "minimum_stock",
+                "status",
+                "created_at",
+                "area_id"
+            );
 
         if ($user->role === "Manager") {
 
@@ -341,7 +612,6 @@ class ReportExportService
                 "area_id",
                 $user->area_id
             );
-
         }
 
         return $query
@@ -350,34 +620,39 @@ class ReportExportService
     }
 
     /**
+     * ==========================================================
      * Inventory Transactions Data
+     * ==========================================================
      */
     public function getInventoryTransactionData()
     {
         $user = Auth::user();
 
-        $query = InventoryTransaction::with([
-            "inventoryItem",
-            "fromArea",
-            "toArea",
-            "user",
-        ]);
+        $query =
+            InventoryTransaction::with(
+                [
+                    "inventoryItem",
+                    "fromArea",
+                    "toArea",
+                    "user",
+                ]
+            );
 
         if ($user->role === "Manager") {
 
-            $query->where(function ($q) use ($user) {
+            $query->where(
+                function ($q) use ($user) {
 
-                $q->where(
-                    "from_area_id",
-                    $user->area_id
-                )
-                ->orWhere(
-                    "to_area_id",
-                    $user->area_id
-                );
-
-            });
-
+                    $q->where(
+                        "from_area_id",
+                        $user->area_id
+                    )
+                        ->orWhere(
+                            "to_area_id",
+                            $user->area_id
+                        );
+                }
+            );
         }
 
         return $query
@@ -386,24 +661,32 @@ class ReportExportService
     }
 
     /**
+     * ==========================================================
      * Bills Data
+     * ==========================================================
      */
     public function getBillsData()
     {
         $user = Auth::user();
 
-        $query = Bill::select(
-            "id",
-            "consumer_name",
-            "reference_number",
-            "bill_month",
-            "bill_year",
-            "units_consumed",
-            "bill_amount",
-            "status",
-            "created_at",
-            "created_by"
-        );
+        $query =
+            Bill::with("area")
+                ->select(
+                    "id",
+                    "consumer_name",
+                    "reference_number",
+                    "bill_month",
+                    "bill_year",
+                    "area_id",
+                    "units_consumed",
+                    "bill_amount",
+                    "generated_units",
+                    "difference_units",
+                    "generation_loss_reason",
+                    "status",
+                    "created_at",
+                    "created_by"
+                );
 
         if ($user->role === "Manager") {
 
@@ -411,7 +694,6 @@ class ReportExportService
                 "created_by",
                 $user->id
             );
-
         }
 
         return $query
@@ -420,73 +702,103 @@ class ReportExportService
     }
 
     /**
+     * ==========================================================
      * Get Report Data By Module
+     * ==========================================================
      */
-    public function getModuleData(string $module)
-    {
+    public function getModuleData(
+        string $module
+    ) {
         $module = strtolower($module);
 
         return match ($module) {
 
-            "users" => $this->getUsersData(),
+            "users" =>
+                $this->getUsersData(),
 
-            "areas" => $this->getAreasData(),
+            "areas" =>
+                $this->getAreasData(),
 
-            "inventory" => $this->getInventoryData(),
+            "inventory" =>
+                $this->getInventoryData(),
 
-            "transactions" => $this->getInventoryTransactionData(),
+            "transactions" =>
+                $this->getInventoryTransactionData(),
 
-            "bills" => $this->getBillsData(),
+            "bills" =>
+                $this->getBillsData(),
 
-            default => collect(),
-
+            default =>
+                collect(),
         };
     }
 
     /**
+     * ==========================================================
      * Get Report Title
+     * ==========================================================
      */
-    public function getModuleTitle(string $module): string
-    {
-        return match (strtolower($module)) {
+    public function getModuleTitle(
+        string $module
+    ): string {
 
-            "users" => "Users Report",
+        return match (
+            strtolower($module)
+        ) {
 
-            "areas" => "Areas Report",
+            "users" =>
+                "Users Report",
 
-            "inventory" => "Inventory Report",
+            "areas" =>
+                "Areas Report",
 
-            "transactions" => "Inventory Transactions Report",
+            "inventory" =>
+                "Inventory Report",
 
-            "bills" => "WAPDA Bills Report",
+            "transactions" =>
+                "Inventory Transactions Report",
 
-            default => "Report",
+            "bills" =>
+                "WAPDA Bill Analysis Report",
 
+            default =>
+                "Report",
         };
     }
 
     /**
+     * ==========================================================
      * Get Blade View
+     * ==========================================================
      */
-    public function getModuleView(string $module): string
-    {
-        return match (strtolower($module)) {
+    public function getModuleView(
+        string $module
+    ): string {
 
-            "users" => "reports.users",
+        return match (
+            strtolower($module)
+        ) {
 
-            "areas" => "reports.areas",
+            "users" =>
+                "reports.users",
 
-            "inventory" => "reports.inventory",
+            "areas" =>
+                "reports.areas",
 
-            "transactions" => "reports.transactions",
+            "inventory" =>
+                "reports.inventory",
 
-            "bills" => "reports.bills",
+            "transactions" =>
+                "reports.transactions",
 
-            default => abort(
-                404,
-                "Invalid Report Module."
-            ),
+            "bills" =>
+                "reports.bills",
 
+            default =>
+                abort(
+                    404,
+                    "Invalid Report Module."
+                ),
         };
     }
 }

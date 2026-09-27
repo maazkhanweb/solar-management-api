@@ -8,6 +8,7 @@ use App\Models\InventoryItem;
 use App\Models\User;
 use App\Services\Analysis\BillAnalysisService;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class DashboardService
 {
@@ -28,39 +29,45 @@ class DashboardService
         ReportService $reportService,
         BillAnalysisService $billAnalysisService
     ) {
-        $this->reportService = $reportService;
+        $this->reportService =
+            $reportService;
 
-        $this->billAnalysisService = $billAnalysisService;
+        $this->billAnalysisService =
+            $billAnalysisService;
     }
 
+
     /**
+     * ==========================================================
      * Get Dashboard Data
+     * ==========================================================
      */
     public function getDashboardData(): array
     {
         return [
 
-            'statistics' => $this->getStatistics(),
+            'statistics' =>
+                $this->getStatistics(),
 
-            'production' => $this->getProductionChart(),
-
-            'batteryHealth' => $this->getBatteryHealthChart(),
-
-            'wapdaTrend' => $this->getWapdaBillTrend(),
-
-            'aiPerformance' => $this->getAiPerformance(),
-
-            'comparisons' => $this->getAreaComparisons(),
+            /*
+             * Month-wise comparison data
+             */
+            'comparisons' =>
+                $this->getMonthlyComparisons(),
 
         ];
     }
 
+
     /**
+     * ==========================================================
      * Dashboard Statistics
+     * ==========================================================
      */
     private function getStatistics(): array
     {
         $user = Auth::user();
+
 
         /*
         |--------------------------------------------------------------------------
@@ -72,33 +79,39 @@ class DashboardService
 
             return [
 
-                'totalUsers' => User::count(),
+                'totalUsers' =>
+                    User::count(),
 
-                'totalAreas' => Area::count(),
+                'totalAreas' =>
+                    Area::count(),
 
-                'totalInventoryItems' => InventoryItem::count(),
+                'totalInventoryItems' =>
+                    InventoryItem::count(),
 
-                'totalAssignedItems' => InventoryItem::where(
-                    'assigned_quantity',
-                    '>',
-                    0
-                )->count(),
+                'totalAssignedItems' =>
+                    InventoryItem::where(
+                        'assigned_quantity',
+                        '>',
+                        0
+                    )->count(),
 
-                'totalLowStockItems' => InventoryItem::all()
-                    ->filter(function ($item) {
+                'totalLowStockItems' =>
+                    InventoryItem::whereColumn(
+                        'available_quantity',
+                        '<=',
+                        'minimum_stock'
+                    )->count(),
 
-                        return $item->available_quantity <= $item->minimum_stock;
+                'totalWapdaBills' =>
+                    Bill::count(),
 
-                    })
-                    ->count(),
-
-                'totalWapdaBills' => Bill::count(),
-
-                'totalReports' => $this->reportService->getReportCount(),
+                'totalReports' =>
+                    $this->reportService
+                        ->getReportCount(),
 
             ];
-
         }
+
 
         /*
         |--------------------------------------------------------------------------
@@ -111,132 +124,117 @@ class DashboardService
             /*
              * Users
              */
+            'totalUsers' =>
+                User::where(
+                    'area_id',
+                    $user->area_id
+                )->count(),
 
-            'totalUsers' => User::where(
-                'area_id',
-                $user->area_id
-            )->count(),
 
             /*
              * Areas
              */
+            'totalAreas' =>
+                1,
 
-            'totalAreas' => 1,
 
             /*
              * Inventory
              */
+            'totalInventoryItems' =>
+                InventoryItem::where(
+                    'area_id',
+                    $user->area_id
+                )->count(),
 
-            'totalInventoryItems' => InventoryItem::where(
-                'area_id',
-                $user->area_id
-            )->count(),
 
             /*
              * Assigned Items
              */
+            'totalAssignedItems' =>
+                InventoryItem::where(
+                    'area_id',
+                    $user->area_id
+                )
+                ->where(
+                    'assigned_quantity',
+                    '>',
+                    0
+                )
+                ->count(),
 
-            'totalAssignedItems' => InventoryItem::where(
-                'area_id',
-                $user->area_id
-            )
-            ->where(
-                'assigned_quantity',
-                '>',
-                0
-            )
-            ->count(),
 
             /*
              * Low Stock
              */
+            'totalLowStockItems' =>
+                InventoryItem::where(
+                    'area_id',
+                    $user->area_id
+                )
+                ->whereColumn(
+                    'available_quantity',
+                    '<=',
+                    'minimum_stock'
+                )
+                ->count(),
 
-            'totalLowStockItems' => InventoryItem::where(
-                'area_id',
-                $user->area_id
-            )
-            ->get()
-            ->filter(function ($item) {
-
-                return $item->available_quantity <= $item->minimum_stock;
-
-            })
-            ->count(),
 
             /*
              * Bills uploaded by Manager
              */
+            'totalWapdaBills' =>
+                Bill::where(
+                    'created_by',
+                    $user->id
+                )->count(),
 
-            'totalWapdaBills' => Bill::where(
-                'created_by',
-                $user->id
-            )->count(),
 
             /*
              * Reports
              */
-
-            'totalReports' => $this->reportService->getReportCount(),
+            'totalReports' =>
+                $this->reportService
+                    ->getReportCount(),
 
         ];
     }
 
+
     /**
-     * Area Wise Solar vs WAPDA Comparison
+     * ==========================================================
+     * MONTH-WISE AREA COMPARISONS
+     * ==========================================================
+     *
+     * Structure:
+     *
+     * [
+     *     [
+     *         'month' => 8,
+     *         'year' => 2026,
+     *         'month_name' => 'August 2026',
+     *         'comparison_count' => 3,
+     *         'comparisons' => [...]
+     *     ]
+     * ]
+     *
      */
-    private function getAreaComparisons(): array
+    private function getMonthlyComparisons(): array
     {
         $user = Auth::user();
 
         /*
         |--------------------------------------------------------------------------
-        | Areas
+        | Bill Query
         |--------------------------------------------------------------------------
         */
 
-        $areaQuery = Area::query()
-            ->select([
-                'id',
-                'area_name',
-                'status',
-            ])
-            ->orderBy('area_name');
+        $billQuery = Bill::query();
+
 
         /*
         |--------------------------------------------------------------------------
-        | Manager
-        |--------------------------------------------------------------------------
-        */
-
-        if ($user->role === 'Manager') {
-
-            $areaQuery->where(
-                'id',
-                $user->area_id
-            );
-
-        }
-
-        $areas = $areaQuery->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Bills
-        |--------------------------------------------------------------------------
-        */
-
-        $billQuery = Bill::query()
-            ->whereIn(
-                'area_id',
-                $areas->pluck('id')
-            )
-            ->orderByDesc('bill_year')
-            ->orderByDesc('bill_month')
-            ->orderByDesc('id');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Manager Bills
+        | Manager Restriction
         |--------------------------------------------------------------------------
         */
 
@@ -249,198 +247,494 @@ class DashboardService
 
         }
 
-        $latestBills = $billQuery
-            ->get()
-            ->groupBy('area_id');
 
         /*
         |--------------------------------------------------------------------------
-        | Build Comparison Data
+        | Get Bills
+        |--------------------------------------------------------------------------
+        |
+        | Latest bills first.
+        |
+        */
+
+        $bills = $billQuery
+            ->orderByDesc('bill_year')
+            ->orderByDesc('bill_month')
+            ->orderByDesc('id')
+            ->get();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | No Bills
         |--------------------------------------------------------------------------
         */
 
-        return $areas->map(function ($area) use ($latestBills) {
+        if ($bills->isEmpty()) {
 
-            $bill = $latestBills
-                ->get($area->id)
-                ?->first();
+            return [];
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Group Bills By Year + Month
+        |--------------------------------------------------------------------------
+        |
+        | Example:
+        |
+        | 2026-10
+        | 2026-09
+        | 2026-08
+        |
+        */
+
+        $monthlyBills = $bills->groupBy(
+            function ($bill) {
+
+                return
+                    (int) $bill->bill_year
+                    . '-'
+                    . str_pad(
+                        (int) $bill->bill_month,
+                        2,
+                        '0',
+                        STR_PAD_LEFT
+                    );
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Build Monthly Response
+        |--------------------------------------------------------------------------
+        */
+
+        $months = [];
+
+
+        foreach ($monthlyBills as $monthKey => $monthBills) {
 
             /*
             |--------------------------------------------------------------------------
-            | Area Without Bill
+            | First Bill
             |--------------------------------------------------------------------------
             */
 
-            if (!$bill) {
+            $firstBill =
+                $monthBills->first();
 
-                return [
+
+            $month =
+                (int) $firstBill->bill_month;
+
+
+            $year =
+                (int) $firstBill->bill_year;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Validate Month
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                $month < 1 ||
+                $month > 12
+            ) {
+
+                continue;
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Month Name
+            |--------------------------------------------------------------------------
+            */
+
+            $monthName =
+                Carbon::create(
+                    $year,
+                    $month,
+                    1
+                )->format('F Y');
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Avoid Duplicate Area Bills
+            |--------------------------------------------------------------------------
+            |
+            | If an area has multiple bills
+            | for the same month/year,
+            | use the latest bill.
+            |
+            */
+
+            $areaBills =
+                $monthBills
+                    ->groupBy('area_id')
+                    ->map(
+                        function (
+                            $areaBillCollection
+                        ) {
+
+                            return
+                                $areaBillCollection
+                                    ->sortByDesc('id')
+                                    ->first();
+
+                        }
+                    )
+                    ->values();
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Area Comparisons
+            |--------------------------------------------------------------------------
+            */
+
+            $areaComparisons = [];
+
+
+            foreach (
+                $areaBills
+                as $bill
+            ) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Find Area
+                |--------------------------------------------------------------------------
+                */
+
+                $area =
+                    Area::find(
+                        $bill->area_id
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | If Area Doesn't Exist
+                |--------------------------------------------------------------------------
+                */
+
+                if (!$area) {
+
+                    continue;
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Bill Values
+                |--------------------------------------------------------------------------
+                */
+
+                $unitsConsumed =
+                    (float) (
+                        $bill->units_consumed ?? 0
+                    );
+
+
+                $generatedUnits =
+                    (float) (
+                        $bill->generated_units ?? 0
+                    );
+
+
+                $billAmount =
+                    (float) (
+                        $bill->bill_amount ?? 0
+                    );
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Bill Analysis
+                |--------------------------------------------------------------------------
+                */
+
+                $analysisResult =
+                    $this->billAnalysisService->analyze(
+
+                        $unitsConsumed,
+
+                        $generatedUnits,
+
+                        $billAmount
+
+                    );
+
+
+                $analysisData =
+                    $analysisResult['analysis']
+                    ?? [];
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Signed Difference
+                |--------------------------------------------------------------------------
+                |
+                | Positive = Solar Generation > WAPDA Consumption
+                |
+                | Negative = Solar Generation < WAPDA Consumption
+                |
+                */
+
+                $signedDifference =
+                    $generatedUnits -
+                    $unitsConsumed;
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Benefit / Loss
+                |--------------------------------------------------------------------------
+                */
+
+                if (
+                    $signedDifference >= 0
+                ) {
+
+                    $result =
+                        'Benefit';
+
+
+                    $benefitUnits =
+                        $signedDifference;
+
+
+                    $lossUnits =
+                        0;
+
+                } else {
+
+                    $result =
+                        'Loss';
+
+
+                    $benefitUnits =
+                        0;
+
+
+                    $lossUnits =
+                        abs(
+                            $signedDifference
+                        );
+
+                }
+
+
+                /*
+                |--------------------------------------------------------------------------
+                | Area Comparison Object
+                |--------------------------------------------------------------------------
+                */
+
+                $areaComparisons[] = [
 
                     'area' => [
 
-                        'id' => $area->id,
+                        'id' =>
+                            $area->id,
 
-                        'name' => $area->area_name,
+                        'name' =>
+                            $area->area_name,
 
-                        'status' => $area->status,
+                        'status' =>
+                            $area->status,
 
                     ],
 
-                    'has_bill' => false,
 
-                    'bill' => null,
+                    'has_bill' =>
+                        true,
 
-                    'analysis' => null,
 
-                    'comparison' => null,
+                    'bill' => [
+
+                        'id' =>
+                            $bill->id,
+
+                        'month' =>
+                            $month,
+
+                        'year' =>
+                            $year,
+
+                        'month_name' =>
+                            $monthName,
+
+                        'units_consumed' =>
+                            round(
+                                $unitsConsumed,
+                                2
+                            ),
+
+                        'generated_units' =>
+                            round(
+                                $generatedUnits,
+                                2
+                            ),
+
+                        'bill_amount' =>
+                            round(
+                                $billAmount,
+                                2
+                            ),
+
+                    ],
+
+
+                    'analysis' =>
+                        $analysisData,
+
+
+                    'comparison' => [
+
+                        'result' =>
+                            $result,
+
+                        'difference_units' =>
+                            round(
+                                $signedDifference,
+                                2
+                            ),
+
+                        'benefit_units' =>
+                            round(
+                                $benefitUnits,
+                                2
+                            ),
+
+                        'loss_units' =>
+                            round(
+                                $lossUnits,
+                                2
+                            ),
+
+                    ],
 
                 ];
 
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Bill Values
-            |--------------------------------------------------------------------------
-            */
-
-            $unitsConsumed = (float) $bill->units_consumed;
-
-            $generatedUnits = (float) $bill->generated_units;
-
-            $billAmount = (float) $bill->bill_amount;
 
             /*
             |--------------------------------------------------------------------------
-            | Existing Bill Analysis Service
+            | Only Add Month If It Has Comparison Data
             |--------------------------------------------------------------------------
             */
 
-            $analysis = $this->billAnalysisService->analyze(
+            if (
+                empty(
+                    $areaComparisons
+                )
+            ) {
 
-                $unitsConsumed,
-
-                $generatedUnits,
-
-                $billAmount
-
-            );
-
-            $analysisData = $analysis['analysis'];
-
-            /*
-            |--------------------------------------------------------------------------
-            | Signed Difference
-            |--------------------------------------------------------------------------
-            |
-            | Positive = Solar Generation is higher
-            | Negative = WAPDA Consumption is higher
-            |
-            */
-
-            $signedDifference =
-                $generatedUnits -
-                $unitsConsumed;
-
-            /*
-            |--------------------------------------------------------------------------
-            | Benefit / Loss
-            |--------------------------------------------------------------------------
-            */
-
-            if ($signedDifference >= 0) {
-
-                $result = 'Benefit';
-
-                $benefitUnits = $signedDifference;
-
-                $lossUnits = 0;
-
-            } else {
-
-                $result = 'Loss';
-
-                $benefitUnits = 0;
-
-                $lossUnits = abs($signedDifference);
+                continue;
 
             }
 
+
             /*
             |--------------------------------------------------------------------------
-            | Final Response
+            | Add Month
             |--------------------------------------------------------------------------
             */
 
-            return [
+            $months[] = [
 
-                'area' => [
+                'month' =>
+                    $month,
 
-                    'id' => $area->id,
+                'year' =>
+                    $year,
 
-                    'name' => $area->area_name,
+                'month_name' =>
+                    $monthName,
 
-                    'status' => $area->status,
-
-                ],
-
-                'has_bill' => true,
-
-                'bill' => [
-
-    'id' => $bill->id,
-
-    'month' => $bill->bill_month,
-
-    'year' => $bill->bill_year,
-
-    'units_consumed' => round(
-        $unitsConsumed,
-        2
-    ),
-
-    'bill_amount' => round(
-        $billAmount,
-        2
-    ),
-
-],
-
-                'analysis' => $analysisData,
-
-                'comparison' => [
-
-                    'result' => $result,
-
-                    'difference_units' => round(
-                        $signedDifference,
-                        2
+                'comparison_count' =>
+                    count(
+                        $areaComparisons
                     ),
 
-                    'benefit_units' => round(
-                        $benefitUnits,
-                        2
-                    ),
-
-                    'loss_units' => round(
-                        $lossUnits,
-                        2
-                    ),
-
-                ],
+                'comparisons' =>
+                    $areaComparisons,
 
             ];
 
-        })->values()->toArray();
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Sort Months
+        |--------------------------------------------------------------------------
+        |
+        | Latest month first.
+        |
+        */
+
+        usort(
+            $months,
+            function (
+                $a,
+                $b
+            ) {
+
+                if (
+                    $a['year'] ===
+                    $b['year']
+                ) {
+
+                    return
+                        $b['month'] -
+                        $a['month'];
+
+                }
+
+                return
+                    $b['year'] -
+                    $a['year'];
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Return Monthly Comparisons
+        |--------------------------------------------------------------------------
+        */
+
+        return $months;
     }
 
+
     /**
+     * ==========================================================
      * Solar Production Chart
+     * ==========================================================
      */
     private function getProductionChart(): array
     {
         $user = Auth::user();
 
-        $query = Bill::query();
+        $query =
+            Bill::query();
+
 
         /*
         |--------------------------------------------------------------------------
@@ -448,7 +742,10 @@ class DashboardService
         |--------------------------------------------------------------------------
         */
 
-        if ($user->role === 'Manager') {
+        if (
+            $user->role ===
+            'Manager'
+        ) {
 
             $query->where(
                 'created_by',
@@ -457,14 +754,26 @@ class DashboardService
 
         }
 
-        $rows = $query
-            ->selectRaw("
-                bill_month,
-                COALESCE(SUM(generated_units),0) as production
-            ")
-            ->groupBy('bill_month')
-            ->orderBy('bill_month')
-            ->get();
+
+        $rows =
+            $query
+                ->selectRaw(
+                    "
+                    bill_month,
+                    COALESCE(
+                        SUM(generated_units),
+                        0
+                    ) as production
+                    "
+                )
+                ->groupBy(
+                    'bill_month'
+                )
+                ->orderBy(
+                    'bill_month'
+                )
+                ->get();
+
 
         $months = [
 
@@ -483,42 +792,60 @@ class DashboardService
 
         ];
 
+
         $chart = [];
 
-        foreach ($months as $number => $name) {
 
-            $production = optional(
-                $rows->firstWhere(
-                    'bill_month',
-                    $number
-                )
-            )->production ?? 0;
+        foreach (
+            $months
+            as $number => $name
+        ) {
+
+            $production =
+                optional(
+                    $rows->firstWhere(
+                        'bill_month',
+                        $number
+                    )
+                )->production
+                ?? 0;
+
 
             $chart[] = [
 
-                'month' => $name,
+                'month' =>
+                    $name,
 
-                'production' => (float) $production,
+                'production' =>
+                    (float) $production,
 
             ];
 
         }
 
+
         return $chart;
     }
 
+
     /**
+     * ==========================================================
      * Battery Health Chart
+     * ==========================================================
      */
     private function getBatteryHealthChart(): array
     {
-        $user = Auth::user();
+        $user =
+            Auth::user();
 
-        $query = InventoryItem::query()
-            ->where(
-                'item_type',
-                'battery'
-            );
+
+        $query =
+            InventoryItem::query()
+                ->where(
+                    'item_type',
+                    'battery'
+                );
+
 
         /*
         |--------------------------------------------------------------------------
@@ -526,7 +853,10 @@ class DashboardService
         |--------------------------------------------------------------------------
         */
 
-        if ($user->role === 'Manager') {
+        if (
+            $user->role ===
+            'Manager'
+        ) {
 
             $query->where(
                 'area_id',
@@ -535,35 +865,55 @@ class DashboardService
 
         }
 
-        $batteries = $query
-            ->orderBy('item_name')
-            ->get();
+
+        $batteries =
+            $query
+                ->orderBy(
+                    'item_name'
+                )
+                ->get();
+
 
         $chart = [];
 
-        foreach ($batteries as $battery) {
+
+        foreach (
+            $batteries
+            as $battery
+        ) {
 
             $chart[] = [
 
-                'battery' => $battery->item_name,
+                'battery' =>
+                    $battery->item_name,
 
-                'health' => (float) $battery->battery_health,
+                'health' =>
+                    (float)
+                    $battery->battery_health,
 
             ];
 
         }
 
+
         return $chart;
     }
 
+
     /**
+     * ==========================================================
      * WAPDA Bill Trend
+     * ==========================================================
      */
     private function getWapdaBillTrend(): array
     {
-        $user = Auth::user();
+        $user =
+            Auth::user();
 
-        $query = Bill::query();
+
+        $query =
+            Bill::query();
+
 
         /*
         |--------------------------------------------------------------------------
@@ -571,7 +921,10 @@ class DashboardService
         |--------------------------------------------------------------------------
         */
 
-        if ($user->role === 'Manager') {
+        if (
+            $user->role ===
+            'Manager'
+        ) {
 
             $query->where(
                 'created_by',
@@ -580,14 +933,26 @@ class DashboardService
 
         }
 
-        $rows = $query
-            ->selectRaw("
-                bill_month,
-                COALESCE(SUM(bill_amount),0) as total_bill
-            ")
-            ->groupBy('bill_month')
-            ->orderBy('bill_month')
-            ->get();
+
+        $rows =
+            $query
+                ->selectRaw(
+                    "
+                    bill_month,
+                    COALESCE(
+                        SUM(bill_amount),
+                        0
+                    ) as total_bill
+                    "
+                )
+                ->groupBy(
+                    'bill_month'
+                )
+                ->orderBy(
+                    'bill_month'
+                )
+                ->get();
+
 
         $months = [
 
@@ -606,40 +971,56 @@ class DashboardService
 
         ];
 
+
         $chart = [];
 
-        foreach ($months as $number => $name) {
 
-            $bill = optional(
+        foreach (
+            $months
+            as $number => $name
+        ) {
 
-                $rows->firstWhere(
-                    'bill_month',
-                    $number
-                )
+            $bill =
+                optional(
+                    $rows->firstWhere(
+                        'bill_month',
+                        $number
+                    )
+                )->total_bill
+                ?? 0;
 
-            )->total_bill ?? 0;
 
             $chart[] = [
 
-                'month' => $name,
+                'month' =>
+                    $name,
 
-                'bill' => (float) $bill,
+                'bill' =>
+                    (float) $bill,
 
             ];
 
         }
 
+
         return $chart;
     }
 
+
     /**
+     * ==========================================================
      * AI Performance
+     * ==========================================================
      */
     private function getAiPerformance(): array
     {
-        $user = Auth::user();
+        $user =
+            Auth::user();
 
-        $query = Bill::query();
+
+        $query =
+            Bill::query();
+
 
         /*
         |--------------------------------------------------------------------------
@@ -647,7 +1028,10 @@ class DashboardService
         |--------------------------------------------------------------------------
         */
 
-        if ($user->role === 'Manager') {
+        if (
+            $user->role ===
+            'Manager'
+        ) {
 
             $query->where(
                 'created_by',
@@ -656,7 +1040,10 @@ class DashboardService
 
         }
 
-        $bills = $query->get();
+
+        $bills =
+            $query->get();
+
 
         $excellent = 0;
 
@@ -666,19 +1053,32 @@ class DashboardService
 
         $poor = 0;
 
-        foreach ($bills as $bill) {
 
-            $confidence = (float) $bill->ocr_confidence;
+        foreach (
+            $bills
+            as $bill
+        ) {
 
-            if ($confidence >= 95) {
+            $confidence =
+                (float)
+                $bill->ocr_confidence;
+
+
+            if (
+                $confidence >= 95
+            ) {
 
                 $excellent++;
 
-            } elseif ($confidence >= 85) {
+            } elseif (
+                $confidence >= 85
+            ) {
 
                 $good++;
 
-            } elseif ($confidence >= 70) {
+            } elseif (
+                $confidence >= 70
+            ) {
 
                 $average++;
 
@@ -690,37 +1090,46 @@ class DashboardService
 
         }
 
+
         return [
 
             [
 
-                'name' => 'Excellent',
+                'name' =>
+                    'Excellent',
 
-                'value' => $excellent,
-
-            ],
-
-            [
-
-                'name' => 'Good',
-
-                'value' => $good,
+                'value' =>
+                    $excellent,
 
             ],
 
             [
 
-                'name' => 'Average',
+                'name' =>
+                    'Good',
 
-                'value' => $average,
+                'value' =>
+                    $good,
 
             ],
 
             [
 
-                'name' => 'Poor',
+                'name' =>
+                    'Average',
 
-                'value' => $poor,
+                'value' =>
+                    $average,
+
+            ],
+
+            [
+
+                'name' =>
+                    'Poor',
+
+                'value' =>
+                    $poor,
 
             ],
 

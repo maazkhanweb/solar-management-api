@@ -28,45 +28,45 @@ class InventoryAssignmentService
     /**
      * Get All Assignments
      */
-    public function getAssignments(): Collection
-    {
-        $query = InventoryAssignment::with([
-
+   public function getAssignments(): Collection
+{
+    $query = InventoryAssignment::query()
+        ->select([
+            'id',
+            'inventory_item_id',
+            'area_id',
+            'quantity',
+            'assigned_by',
+            'assigned_at',
+            'returned_at',
+            'status',
+            'remarks',
+        ])
+        ->with([
             'inventoryItem',
-
             'area',
-
             'assignedBy',
-
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Manager can view only his Area Assignments
-        |--------------------------------------------------------------------------
-        */
+    /*
+    |--------------------------------------------------------------------------
+    | Manager can view only his Area Assignments
+    |--------------------------------------------------------------------------
+    */
 
-        if (
-
-            Auth::user()->role === 'Manager'
-
-        ) {
-
-            $query->where(
-
-                'area_id',
-
-                Auth::user()->area_id
-
-            );
-
-        }
-
-        return $query
-            ->latest()
-            ->get();
+    if (
+        Auth::user()->role === 'Manager'
+    ) {
+        $query->where(
+            'area_id',
+            Auth::user()->area_id
+        );
     }
 
+    return $query
+        ->latest()
+        ->get();
+}
     /**
      * Assign Inventory To Area
      */

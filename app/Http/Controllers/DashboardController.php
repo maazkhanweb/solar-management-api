@@ -9,20 +9,29 @@ class DashboardController extends Controller
 {
     protected DashboardService $dashboardService;
 
-    public function __construct(DashboardService $dashboardService)
-    {
+    public function __construct(
+        DashboardService $dashboardService
+    ) {
         $this->dashboardService = $dashboardService;
     }
 
     /**
-     * Dashboard Statistics
+     * Dashboard Data
      */
     public function index(): JsonResponse
     {
+        $dashboardData =
+            $this->dashboardService->getDashboardData();
+
         return response()->json([
+
             'success' => true,
-            'message' => 'Dashboard statistics fetched successfully.',
-            'data' => $this->dashboardService->getDashboardData()
+
+            'message' =>
+                'Dashboard data fetched successfully.',
+
+            'data' => $dashboardData,
+
         ]);
     }
 }

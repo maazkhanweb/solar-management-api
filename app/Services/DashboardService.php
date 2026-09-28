@@ -45,17 +45,139 @@ class DashboardService
      */
     public function getDashboardData(): array
     {
+        $user = Auth::user();
+
+        $dashboardData = $this->getDashboardQueryData($user);
+
         return [
 
             'statistics' =>
-                $this->getStatistics(),
+                $this->getStatistics(
+                    $dashboardData->statistics,
+                    $user
+                ),
 
             /*
              * Month-wise comparison data
              */
             'comparisons' =>
-                $this->getMonthlyComparisons(),
+                $this->getMonthlyComparisons(
+                    collect($dashboardData->bills)
+                ),
 
+        ];
+    }
+
+
+    /**
+     * Fetch dashboard statistics and bills in one PostgreSQL round trip.
+     */
+    private function getDashboardQueryData(User $user): object
+    {
+        if ($user->role === 'Administrator') {
+
+            $dashboardData = DB::selectOne(<<<'SQL'
+WITH statistics AS (
+    SELECT
+        (SELECT COUNT(*) FROM users) AS total_users,
+        (SELECT COUNT(*) FROM areas) AS total_areas,
+        inventory_statistics.total_inventory_items,
+        inventory_statistics.total_assigned_items,
+        inventory_statistics.total_low_stock_items,
+        (SELECT COUNT(*) FROM bills) AS total_wapda_bills
+    FROM (
+        SELECT
+            COUNT(*) AS total_inventory_items,
+            COALESCE(SUM(CASE WHEN assigned_quantity > 0 THEN 1 ELSE 0 END), 0) AS total_assigned_items,
+            COALESCE(SUM(CASE WHEN available_quantity <= minimum_stock THEN 1 ELSE 0 END), 0) AS total_low_stock_items
+        FROM inventory_items
+    ) AS inventory_statistics
+)
+SELECT
+    row_to_json(statistics)::text AS statistics,
+    COALESCE(
+        (
+            SELECT json_agg(
+                json_build_object(
+                    'id', bills.id,
+                    'area_id', bills.area_id,
+                    'bill_month', bills.bill_month,
+                    'bill_year', bills.bill_year,
+                    'units_consumed', bills.units_consumed,
+                    'generated_units', bills.generated_units,
+                    'bill_amount', bills.bill_amount,
+                    'dashboard_area_id', areas.id,
+                    'dashboard_area_name', areas.area_name,
+                    'dashboard_area_status', areas.status
+                )
+                ORDER BY bills.bill_year DESC, bills.bill_month DESC, bills.id DESC
+            )
+            FROM bills
+            LEFT JOIN areas ON bills.area_id = areas.id
+        ),
+        '[]'::json
+    )::text AS bills
+FROM statistics
+SQL);
+        } else {
+
+            $dashboardQuery = <<<'SQL'
+WITH statistics AS (
+    SELECT
+        (SELECT COUNT(*) FROM users WHERE area_id IS NOT DISTINCT FROM ?) AS total_users,
+        1 AS total_areas,
+        inventory_statistics.total_inventory_items,
+        inventory_statistics.total_assigned_items,
+        inventory_statistics.total_low_stock_items,
+        (SELECT COUNT(*) FROM bills WHERE created_by = ?) AS total_wapda_bills
+    FROM (
+        SELECT
+            COUNT(*) AS total_inventory_items,
+            COALESCE(SUM(CASE WHEN assigned_quantity > 0 THEN 1 ELSE 0 END), 0) AS total_assigned_items,
+            COALESCE(SUM(CASE WHEN available_quantity <= minimum_stock THEN 1 ELSE 0 END), 0) AS total_low_stock_items
+        FROM inventory_items
+        WHERE area_id IS NOT DISTINCT FROM ?
+    ) AS inventory_statistics
+)
+SELECT
+    row_to_json(statistics)::text AS statistics,
+    COALESCE(
+        (
+            SELECT json_agg(
+                json_build_object(
+                    'id', bills.id,
+                    'area_id', bills.area_id,
+                    'bill_month', bills.bill_month,
+                    'bill_year', bills.bill_year,
+                    'units_consumed', bills.units_consumed,
+                    'generated_units', bills.generated_units,
+                    'bill_amount', bills.bill_amount,
+                    'dashboard_area_id', areas.id,
+                    'dashboard_area_name', areas.area_name,
+                    'dashboard_area_status', areas.status
+                )
+                ORDER BY bills.bill_year DESC, bills.bill_month DESC, bills.id DESC
+            )
+            FROM bills
+            LEFT JOIN areas ON bills.area_id = areas.id
+            WHERE bills.created_by = ?
+        ),
+        '[]'::json
+    )::text AS bills
+FROM statistics
+SQL;
+
+            $dashboardData = DB::selectOne($dashboardQuery, [
+                $user->area_id,
+                $user->id,
+                $user->area_id,
+                $user->id,
+            ]);
+        }
+
+        return (object) [
+            'statistics' => json_decode($dashboardData->statistics),
+            'bills' => json_decode($dashboardData->bills),
         ];
     }
 
@@ -65,14 +187,8 @@ class DashboardService
      * Dashboard Statistics
      * ==========================================================
      */
-    private function getStatistics(): array
+    private function getStatistics(object $statistics, User $user): array
     {
-        $user = Auth::user();
-
-        $statistics = $user->role === 'Administrator'
-            ? DB::selectOne('SELECT (SELECT COUNT(*) FROM users) AS total_users, (SELECT COUNT(*) FROM areas) AS total_areas, inventory_statistics.total_inventory_items, inventory_statistics.total_assigned_items, inventory_statistics.total_low_stock_items, (SELECT COUNT(*) FROM bills) AS total_wapda_bills FROM (SELECT COUNT(*) AS total_inventory_items, COALESCE(SUM(CASE WHEN assigned_quantity > 0 THEN 1 ELSE 0 END), 0) AS total_assigned_items, COALESCE(SUM(CASE WHEN available_quantity <= minimum_stock THEN 1 ELSE 0 END), 0) AS total_low_stock_items FROM inventory_items) AS inventory_statistics')
-            : DB::selectOne('SELECT (SELECT COUNT(*) FROM users WHERE area_id IS NOT DISTINCT FROM ?) AS total_users, 1 AS total_areas, inventory_statistics.total_inventory_items, inventory_statistics.total_assigned_items, inventory_statistics.total_low_stock_items, (SELECT COUNT(*) FROM bills WHERE created_by = ?) AS total_wapda_bills FROM (SELECT COUNT(*) AS total_inventory_items, COALESCE(SUM(CASE WHEN assigned_quantity > 0 THEN 1 ELSE 0 END), 0) AS total_assigned_items, COALESCE(SUM(CASE WHEN available_quantity <= minimum_stock THEN 1 ELSE 0 END), 0) AS total_low_stock_items FROM inventory_items WHERE area_id IS NOT DISTINCT FROM ?) AS inventory_statistics', [$user->area_id, $user->id, $user->area_id]);
-
 
         /*
         |--------------------------------------------------------------------------
@@ -189,64 +305,8 @@ class DashboardService
      * ]
      *
      */
-    private function getMonthlyComparisons(): array
+    private function getMonthlyComparisons($bills): array
     {
-        $user = Auth::user();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Bill Query
-        |--------------------------------------------------------------------------
-        */
-
-        $billQuery = Bill::query()
-            ->leftJoin('areas', 'bills.area_id', '=', 'areas.id')
-            ->select([
-                'bills.id',
-                'bills.area_id',
-                'bills.bill_month',
-                'bills.bill_year',
-                'bills.units_consumed',
-                'bills.generated_units',
-                'bills.bill_amount',
-                'areas.id as dashboard_area_id',
-                'areas.area_name as dashboard_area_name',
-                'areas.status as dashboard_area_status',
-            ]);
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Manager Restriction
-        |--------------------------------------------------------------------------
-        */
-
-        if ($user->role === 'Manager') {
-
-            $billQuery->where(
-                'created_by',
-                $user->id
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Get Bills
-        |--------------------------------------------------------------------------
-        |
-        | Latest bills first.
-        |
-        */
-
-        $bills = $billQuery
-            ->orderByDesc('bill_year')
-            ->orderByDesc('bill_month')
-            ->orderByDesc('bills.id')
-            ->get();
-
-
         /*
         |--------------------------------------------------------------------------
         | No Bills

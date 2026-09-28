@@ -97,9 +97,14 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Supabase's transaction pooler (port 6543) cannot safely retain
+            // server-side prepared statements between pooled connections.
             'options' => env('APP_ENV') === 'local'
-                ? [\PDO::ATTR_PERSISTENT => true]
-                : [],
+                ? [
+                    \PDO::ATTR_PERSISTENT => true,
+                    \PDO::ATTR_EMULATE_PREPARES => true,
+                ]
+                : [\PDO::ATTR_EMULATE_PREPARES => true],
         ],
 
         'sqlsrv' => [

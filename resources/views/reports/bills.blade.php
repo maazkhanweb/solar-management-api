@@ -277,22 +277,6 @@
                         Difference Units
                     </th>
 
-                   
-
-                    <th>
-                        Solar Coverage
-                    </th>
-
-                    
-
-                    <th>
-                        Estimated Saving
-                    </th>
-
-                    <th>
-                        Efficiency
-                    </th>
-
                     <th>
                         Generation Loss Reason
                     </th>
@@ -318,38 +302,6 @@
                             $analysis['difference_units'],
                             2
                         ) }}
-                    </td>
-
-                    <td>
-                        {{ number_format(
-                            $analysis['unit_rate'],
-                            2
-                        ) }}
-                    </td>
-
-                    <td>
-                        {{ number_format(
-                            $analysis['solar_coverage'],
-                            2
-                        ) }}%
-                    </td>
-
-                    <td>
-                        {{ number_format(
-                            $analysis['wapda_dependency'],
-                            2
-                        ) }}%
-                    </td>
-
-                    <td>
-                        {{ number_format(
-                            $analysis['estimated_saving'],
-                            2
-                        ) }}
-                    </td>
-
-                    <td>
-                        {{ $analysis['efficiency'] }}
                     </td>
 
                     <td>

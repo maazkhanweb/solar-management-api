@@ -29,6 +29,25 @@ Route::post('/login', [AuthController::class, 'login']);
 
 /*
 |--------------------------------------------------------------------------
+| Lightweight Production Warm-up
+|--------------------------------------------------------------------------
+|
+| Used by Vercel Cron to keep the Laravel container and database connection
+| warm between user requests. No authentication is required because this
+| endpoint performs no application work beyond a lightweight DB ping.
+|
+*/
+Route::get('/warmup', function () {
+    \DB::select('SELECT 1');
+
+    return response()->json([
+        'success' => true,
+        'status' => 'warm',
+    ]);
+});
+
+/*
+|--------------------------------------------------------------------------
 | OCR Temporary Public Routes
 |--------------------------------------------------------------------------
 |

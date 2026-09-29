@@ -1,0 +1,16 @@
+name: Keep API Warm
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  warmup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Warm Laravel API
+        run: |
+          curl --fail --silent --show-error --retry 3 --max-time 30 \
+            https://solar-management-api.vercel.app/api/warmup

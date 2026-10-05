@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\BillAnalysisController;
 use App\Http\Controllers\Api\BillController;
 use App\Http\Controllers\Api\BillOCRController;
+use App\Http\Controllers\Api\ComparisonBillOCRController;
 use App\Http\Controllers\Api\InventoryAssignmentController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\InventoryTransactionController;
@@ -13,11 +14,13 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
+
 /*
 |--------------------------------------------------------------------------
 | Public Routes
 |--------------------------------------------------------------------------
 */
+
 
 /*
 |--------------------------------------------------------------------------
@@ -27,32 +30,42 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login']);
 
+
 /*
 |--------------------------------------------------------------------------
 | Lightweight Production Warm-up
 |--------------------------------------------------------------------------
-|
-| Used by Vercel Cron to keep the Laravel container and database connection
-| warm between user requests. No authentication is required because this
-| endpoint performs no application work beyond a lightweight DB ping.
-|
 */
+
 Route::get('/warmup', function () {
+
     \DB::select('SELECT 1');
 
     return response()->json([
         'success' => true,
         'status' => 'warm',
     ]);
+
 });
+
 
 /*
 |--------------------------------------------------------------------------
 | OCR Temporary Public Routes
 |--------------------------------------------------------------------------
 |
-| During OCR development these routes are public.
-| Later they can be moved inside auth:sanctum middleware.
+| These OCR routes are currently public during development.
+|
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| Existing WAPDA Bill OCR
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| Existing WAPDA OCR remains unchanged.
 |
 */
 
@@ -61,10 +74,37 @@ Route::post(
     [BillOCRController::class, 'process']
 );
 
+
+/*
+|--------------------------------------------------------------------------
+| Existing Solar OCR
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| Existing Solar OCR remains unchanged.
+|
+*/
+
 Route::post(
     '/bills/process-solar-ocr',
     [BillOCRController::class, 'processSolar']
 );
+
+
+/*
+|--------------------------------------------------------------------------
+| NEW AC/DC Comparison OCR
+|--------------------------------------------------------------------------
+|
+| This is a completely separate OCR system.
+|
+*/
+
+Route::post(
+    '/comparison/process-ocr',
+    [ComparisonBillOCRController::class, 'process']
+);
+
 
 /*
 |--------------------------------------------------------------------------
@@ -74,9 +114,13 @@ Route::post(
 
 Route::post('/ocr-test', function () {
 
-    dd('OCR TEST WORKING');
+    return response()->json([
+        'success' => true,
+        'message' => 'OCR TEST WORKING',
+    ]);
 
 });
+
 
 /*
 |--------------------------------------------------------------------------
@@ -86,15 +130,23 @@ Route::post('/ocr-test', function () {
 
 Route::middleware('auth:sanctum')->group(function () {
 
+
     /*
     |--------------------------------------------------------------------------
     | Authentication
     |--------------------------------------------------------------------------
     */
 
-    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post(
+        '/logout',
+        [AuthController::class, 'logout']
+    );
 
-    Route::get('/me', [AuthController::class, 'me']);
+    Route::get(
+        '/me',
+        [AuthController::class, 'me']
+    );
+
 
     /*
     |--------------------------------------------------------------------------
@@ -102,7 +154,11 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get(
+        '/dashboard',
+        [DashboardController::class, 'index']
+    );
+
 
     /*
     |--------------------------------------------------------------------------
@@ -110,17 +166,36 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/users/options', [UserController::class, 'options']);
+    Route::get(
+        '/users/options',
+        [UserController::class, 'options']
+    );
 
-    Route::get('/users', [UserController::class, 'index']);
+    Route::get(
+        '/users',
+        [UserController::class, 'index']
+    );
 
-    Route::get('/users/{user}', [UserController::class, 'show']);
+    Route::get(
+        '/users/{user}',
+        [UserController::class, 'show']
+    );
 
-    Route::post('/users', [UserController::class, 'store']);
+    Route::post(
+        '/users',
+        [UserController::class, 'store']
+    );
 
-    Route::put('/users/{user}', [UserController::class, 'update']);
+    Route::put(
+        '/users/{user}',
+        [UserController::class, 'update']
+    );
 
-    Route::delete('/users/{user}', [UserController::class, 'destroy']);
+    Route::delete(
+        '/users/{user}',
+        [UserController::class, 'destroy']
+    );
+
 
     /*
     |--------------------------------------------------------------------------
@@ -128,27 +203,46 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/areas/options', [AreaController::class, 'options']);
+    Route::get(
+        '/areas/options',
+        [AreaController::class, 'options']
+    );
 
-    Route::get('/areas', [AreaController::class, 'index']);
+    Route::get(
+        '/areas',
+        [AreaController::class, 'index']
+    );
 
-    Route::get('/areas/{area}', [AreaController::class, 'show']);
+    Route::get(
+        '/areas/{area}',
+        [AreaController::class, 'show']
+    );
 
     Route::get(
         '/areas/{area}/assets',
         [AreaController::class, 'assets']
     );
 
-    Route::post('/areas', [AreaController::class, 'store']);
+    Route::post(
+        '/areas',
+        [AreaController::class, 'store']
+    );
 
-    Route::put('/areas/{area}', [AreaController::class, 'update']);
+    Route::put(
+        '/areas/{area}',
+        [AreaController::class, 'update']
+    );
 
     Route::put(
         '/areas/{area}/move-to-inventory',
         [AreaController::class, 'moveToInventory']
     );
 
-    Route::delete('/areas/{area}', [AreaController::class, 'destroy']);
+    Route::delete(
+        '/areas/{area}',
+        [AreaController::class, 'destroy']
+    );
+
 
     /*
     |--------------------------------------------------------------------------
@@ -156,14 +250,20 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/inventory', [InventoryController::class, 'index']);
+    Route::get(
+        '/inventory',
+        [InventoryController::class, 'index']
+    );
 
     Route::get(
         '/inventory/{inventory}',
         [InventoryController::class, 'show']
     );
 
-    Route::post('/inventory', [InventoryController::class, 'store']);
+    Route::post(
+        '/inventory',
+        [InventoryController::class, 'store']
+    );
 
     Route::put(
         '/inventory/{inventory}',
@@ -179,6 +279,7 @@ Route::middleware('auth:sanctum')->group(function () {
         '/inventory/{inventory}',
         [InventoryController::class, 'destroy']
     );
+
 
     /*
     |--------------------------------------------------------------------------
@@ -206,6 +307,7 @@ Route::middleware('auth:sanctum')->group(function () {
         [InventoryAssignmentController::class, 'destroy']
     );
 
+
     /*
     |--------------------------------------------------------------------------
     | Inventory Transactions
@@ -227,20 +329,27 @@ Route::middleware('auth:sanctum')->group(function () {
         [InventoryTransactionController::class, 'destroy']
     );
 
+
     /*
     |--------------------------------------------------------------------------
     | Bill Management
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/bills', [BillController::class, 'index']);
+    Route::get(
+        '/bills',
+        [BillController::class, 'index']
+    );
 
     Route::get(
         '/bills/{bill}',
         [BillController::class, 'show']
     );
 
-    Route::post('/bills', [BillController::class, 'store']);
+    Route::post(
+        '/bills',
+        [BillController::class, 'store']
+    );
 
     Route::put(
         '/bills/{bill}',
@@ -252,6 +361,7 @@ Route::middleware('auth:sanctum')->group(function () {
         [BillController::class, 'destroy']
     );
 
+
     /*
     |--------------------------------------------------------------------------
     | Bill Analysis
@@ -262,6 +372,7 @@ Route::middleware('auth:sanctum')->group(function () {
         '/bills/{bill}/analysis',
         [BillAnalysisController::class, 'analyze']
     );
+
 
     /*
     |--------------------------------------------------------------------------
@@ -279,13 +390,14 @@ Route::middleware('auth:sanctum')->group(function () {
         [ReportController::class, 'preview']
     );
 
- Route::get(
-    '/reports/export/csv/{module}',
-    [ReportController::class, 'exportCsv']
-);
+    Route::get(
+        '/reports/export/csv/{module}',
+        [ReportController::class, 'exportCsv']
+    );
 
-Route::get(
-    '/reports/export/pdf/{module}',
-    [ReportController::class, 'exportPdf']
-);
+    Route::get(
+        '/reports/export/pdf/{module}',
+        [ReportController::class, 'exportPdf']
+    );
+
 });

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\BillAnalysisController;
 use App\Http\Controllers\Api\BillController;
 use App\Http\Controllers\Api\BillOCRController;
+use App\Http\Controllers\Api\ComparisonBillController;
 use App\Http\Controllers\Api\ComparisonBillOCRController;
 use App\Http\Controllers\Api\InventoryAssignmentController;
 use App\Http\Controllers\Api\InventoryController;
@@ -17,23 +18,19 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Public Routes
-|--------------------------------------------------------------------------
-*/
-
-
-/*
-|--------------------------------------------------------------------------
 | Authentication
 |--------------------------------------------------------------------------
 */
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post(
+    '/login',
+    [AuthController::class, 'login']
+);
 
 
 /*
 |--------------------------------------------------------------------------
-| Lightweight Production Warm-up
+| Warmup
 |--------------------------------------------------------------------------
 */
 
@@ -51,21 +48,10 @@ Route::get('/warmup', function () {
 
 /*
 |--------------------------------------------------------------------------
-| OCR Temporary Public Routes
+| EXISTING WAPDA OCR
 |--------------------------------------------------------------------------
 |
-| These OCR routes are currently public during development.
-|
-*/
-
-
-/*
-|--------------------------------------------------------------------------
-| Existing WAPDA Bill OCR
-|--------------------------------------------------------------------------
-|
-| IMPORTANT:
-| Existing WAPDA OCR remains unchanged.
+| DO NOT MODIFY.
 |
 */
 
@@ -73,17 +59,6 @@ Route::post(
     '/bills/process-ocr',
     [BillOCRController::class, 'process']
 );
-
-
-/*
-|--------------------------------------------------------------------------
-| Existing Solar OCR
-|--------------------------------------------------------------------------
-|
-| IMPORTANT:
-| Existing Solar OCR remains unchanged.
-|
-*/
 
 Route::post(
     '/bills/process-solar-ocr',
@@ -93,43 +68,11 @@ Route::post(
 
 /*
 |--------------------------------------------------------------------------
-| NEW AC/DC Comparison OCR
-|--------------------------------------------------------------------------
-|
-| This is a completely separate OCR system.
-|
-*/
-
-Route::post(
-    '/comparison/process-ocr',
-    [ComparisonBillOCRController::class, 'process']
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| OCR Test Route
-|--------------------------------------------------------------------------
-*/
-
-Route::post('/ocr-test', function () {
-
-    return response()->json([
-        'success' => true,
-        'message' => 'OCR TEST WORKING',
-    ]);
-
-});
-
-
-/*
-|--------------------------------------------------------------------------
 | Protected Routes
 |--------------------------------------------------------------------------
 */
 
 Route::middleware('auth:sanctum')->group(function () {
-
 
     /*
     |--------------------------------------------------------------------------
@@ -150,7 +93,76 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Dashboard
+    | AC/DC COMPARISON OCR
+    |--------------------------------------------------------------------------
+    |
+    | Completely separate from WAPDA OCR.
+    |
+    */
+
+    Route::post(
+        '/comparison/process-ocr',
+        [ComparisonBillOCRController::class, 'process']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | AC/DC COMPARISON BILL RECORDS
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/comparison/bills',
+        [ComparisonBillController::class, 'index']
+    );
+
+    Route::get(
+        '/comparison/bills/{comparisonBill}',
+        [ComparisonBillController::class, 'show']
+    );
+
+    /*
+    | Admin only is enforced inside service.
+    */
+
+    Route::put(
+        '/comparison/bills/{comparisonBill}',
+        [ComparisonBillController::class, 'update']
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | HOME ANALYSIS
+    |--------------------------------------------------------------------------
+    |
+    | Saves Home Analysis on the SAME bill record.
+    |
+    */
+
+    Route::post(
+        '/comparison/bills/{comparisonBill}/home-analysis',
+        [ComparisonBillController::class, 'homeAnalysis']
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE
+    |--------------------------------------------------------------------------
+    |
+    | Admin only is enforced inside service.
+    |
+    */
+
+    Route::delete(
+        '/comparison/bills/{comparisonBill}',
+        [ComparisonBillController::class, 'destroy']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | EXISTING DASHBOARD
     |--------------------------------------------------------------------------
     */
 
@@ -162,7 +174,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | User Management
+    | EXISTING USER MANAGEMENT
     |--------------------------------------------------------------------------
     */
 
@@ -199,7 +211,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Area Management
+    | EXISTING AREA MANAGEMENT
     |--------------------------------------------------------------------------
     */
 
@@ -218,11 +230,6 @@ Route::middleware('auth:sanctum')->group(function () {
         [AreaController::class, 'show']
     );
 
-    Route::get(
-        '/areas/{area}/assets',
-        [AreaController::class, 'assets']
-    );
-
     Route::post(
         '/areas',
         [AreaController::class, 'store']
@@ -233,11 +240,6 @@ Route::middleware('auth:sanctum')->group(function () {
         [AreaController::class, 'update']
     );
 
-    Route::put(
-        '/areas/{area}/move-to-inventory',
-        [AreaController::class, 'moveToInventory']
-    );
-
     Route::delete(
         '/areas/{area}',
         [AreaController::class, 'destroy']
@@ -246,7 +248,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Inventory Management
+    | EXISTING INVENTORY
     |--------------------------------------------------------------------------
     */
 
@@ -270,11 +272,6 @@ Route::middleware('auth:sanctum')->group(function () {
         [InventoryController::class, 'update']
     );
 
-    Route::put(
-        '/inventory/{inventory}/return',
-        [InventoryController::class, 'returnInventory']
-    );
-
     Route::delete(
         '/inventory/{inventory}',
         [InventoryController::class, 'destroy']
@@ -283,7 +280,39 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Inventory Assignment
+    | EXISTING INVENTORY TRANSACTIONS
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        '/inventory-transactions',
+        [InventoryTransactionController::class, 'index']
+    );
+
+    Route::get(
+        '/inventory-transactions/{inventoryTransaction}',
+        [InventoryTransactionController::class, 'show']
+    );
+
+    Route::post(
+        '/inventory-transactions',
+        [InventoryTransactionController::class, 'store']
+    );
+
+    Route::put(
+        '/inventory-transactions/{inventoryTransaction}',
+        [InventoryTransactionController::class, 'update']
+    );
+
+    Route::delete(
+        '/inventory-transactions/{inventoryTransaction}',
+        [InventoryTransactionController::class, 'destroy']
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Existing Inventory Assignment
     |--------------------------------------------------------------------------
     */
 
@@ -298,8 +327,8 @@ Route::middleware('auth:sanctum')->group(function () {
     );
 
     Route::put(
-        '/inventory-assignments/{inventoryAssignment}/return',
-        [InventoryAssignmentController::class, 'returnInventory']
+        '/inventory-assignments/{inventoryAssignment}',
+        [InventoryAssignmentController::class, 'update']
     );
 
     Route::delete(
@@ -310,29 +339,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Inventory Transactions
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/inventory-transactions',
-        [InventoryTransactionController::class, 'index']
-    );
-
-    Route::get(
-        '/inventory-transactions/{inventoryTransaction}',
-        [InventoryTransactionController::class, 'show']
-    );
-
-    Route::delete(
-        '/inventory-transactions/{inventoryTransaction}',
-        [InventoryTransactionController::class, 'destroy']
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Bill Management
+    | Existing Bills
     |--------------------------------------------------------------------------
     */
 
@@ -364,40 +371,25 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Bill Analysis
+    | Existing Bill Analysis
     |--------------------------------------------------------------------------
     */
 
     Route::get(
-        '/bills/{bill}/analysis',
-        [BillAnalysisController::class, 'analyze']
+        '/bill-analysis',
+        [BillAnalysisController::class, 'index']
     );
 
 
     /*
     |--------------------------------------------------------------------------
-    | Reports
+    | Existing Reports
     |--------------------------------------------------------------------------
     */
 
     Route::get(
         '/reports',
         [ReportController::class, 'index']
-    );
-
-    Route::get(
-        '/reports/{module}/preview',
-        [ReportController::class, 'preview']
-    );
-
-    Route::get(
-        '/reports/export/csv/{module}',
-        [ReportController::class, 'exportCsv']
-    );
-
-    Route::get(
-        '/reports/export/pdf/{module}',
-        [ReportController::class, 'exportPdf']
     );
 
 });

@@ -5,183 +5,464 @@ namespace App\Services\OCR\Prompts;
 class ComparisonElectricityBillPrompt
 {
     /**
-     * Dedicated OCR prompt for the AC/DC Comparison user flow.
+     * Complete AC/DC comparison electricity bill OCR prompt.
      *
      * IMPORTANT:
-     * This prompt is intentionally separate from the existing
-     * PakistanElectricityBillPrompt used by WAPDA Bill Management.
+     * This prompt is ONLY for the separate Comparison AC & DC OCR system.
+     *
+     * Existing WAPDA Bill OCR is not affected.
      */
     public static function generate(): string
     {
-        return <<<PROMPT
-You are an expert AI OCR system specialized in reading Pakistan electricity bills for a user's AC/DC electricity savings analysis.
+        return <<<'PROMPT'
+You are a highly accurate electricity-bill document OCR and document-understanding system.
 
-You may read bills issued by:
-- PESCO
-- WAPDA
-- LESCO
-- IESCO
-- GEPCO
-- FESCO
-- HESCO
-- MEPCO
-- TESCO
-- QESCO
-- K-Electric
+You must inspect the ENTIRE uploaded electricity bill image or PDF.
 
-The uploaded file may be a bill image or PDF. Carefully inspect the visible bill and extract only the requested fields.
+Do NOT only read the top portion.
 
-The bill may contain blur, rotation, shadows, folds, stamps, watermarks, low quality, handwriting, or OCR-like visual noise. Use the visible printed bill information and do not guess.
+Read every visible section of the bill, including small text, tables, meter readings, historical readings, charges, taxes, payment information, and notes.
 
-If a requested value cannot be clearly identified, return null.
+The goal is to preserve as much information from the original bill as possible.
 
-IMPORTANT:
-Return ONLY valid JSON.
-Do NOT return markdown.
-Do NOT return explanations.
-Do NOT return code fences.
-Do NOT return any extra text.
+==================================================
+CRITICAL RULES
+==================================================
 
-Return exactly this structure:
+1. Inspect the COMPLETE document from top to bottom.
+2. Read all visible sections.
+3. Read all visible tables.
+4. Read all meter readings.
+5. Read all consumption history.
+6. Read all charge rows.
+7. Read all tax rows.
+8. Read all payment information.
+9. Read all dates.
+10. Read all customer/account information.
+11. Read all additional information.
+12. Never invent a value.
+13. Never guess an unreadable value.
+14. If a value cannot be read, return null.
+15. Preserve exact numbers whenever possible.
+16. Preserve leading zeroes in IDs/reference numbers.
+17. Preserve table rows as arrays.
+18. Preserve unknown fields in additional_information.
+19. Do not calculate values that are not printed on the bill.
+20. Return ONLY valid JSON.
+21. Do not return markdown.
+22. Do not return ```json.
+23. Do not return explanations outside JSON.
+
+==================================================
+CUSTOMER / ACCOUNT INFORMATION
+==================================================
+
+Extract all visible customer information.
+
+Fields:
+
+utility_provider
+bill_type
+consumer_name
+father_or_husband_name
+reference_number
+consumer_id
+account_number
+bill_number
+meter_number
+
+If another identifier is visible but does not belong to the above fields, preserve it in additional_information.
+
+==================================================
+ADDRESS / LOCATION
+==================================================
+
+Extract:
+
+area_name
+bill_address
+subdivision
+division
+circle
+feeder
+
+Preserve the exact text visible on the bill.
+
+==================================================
+CONNECTION / TARIFF
+==================================================
+
+Extract:
+
+tariff_category
+connection_type
+phase
+load
+sanctioned_load
+connected_load
+meter_multiplying_factor
+
+==================================================
+BILL PERIOD / DATES
+==================================================
+
+Extract:
+
+bill_month
+bill_year
+billing_period
+billing_days
+connection_date
+issue_date
+reading_date
+due_date
+
+For bill_month:
+
+January = 1
+February = 2
+March = 3
+April = 4
+May = 5
+June = 6
+July = 7
+August = 8
+September = 9
+October = 10
+November = 11
+December = 12
+
+If the bill displays a month and year together, separate them into bill_month and bill_year.
+
+==================================================
+METER READING
+==================================================
+
+Carefully inspect the meter-reading section.
+
+Extract:
+
+previous_reading
+present_reading
+units_consumed
+meter_multiplying_factor
+
+Also extract the complete visible meter-reading table into:
+
+meter_readings
+
+Example:
+
+[
+    {
+        "label": "Previous Reading",
+        "value": 44287
+    },
+    {
+        "label": "Present Reading",
+        "value": 46640
+    }
+]
+
+Do NOT invent rows.
+
+If the bill contains reading dates, meter status, reading type, or other meter information, preserve those fields inside meter_readings.
+
+==================================================
+CONSUMPTION HISTORY
+==================================================
+
+If the bill contains a table showing previous months, readings, units, consumption, or billing history, preserve EVERY visible row.
+
+Use:
+
+reading_history
+
+and:
+
+consumption_history
+
+Example:
+
+[
+    {
+        "month": "July 2026",
+        "units": 1200,
+        "reading": 43000
+    }
+]
+
+Do not invent missing values.
+
+==================================================
+BILL AMOUNTS
+==================================================
+
+Extract all visible monetary amounts.
+
+Fields:
+
+payable_before_due
+payable_after_due
+current_bill
+arrears
+previous_balance
+current_charges
+electricity_charges
+total_amount
+total_payable
+
+Do not confuse:
+
+current_bill
+
+with:
+
+payable_before_due
+
+or:
+
+payable_after_due.
+
+==================================================
+TAXES
+==================================================
+
+Extract all visible taxes and surcharges.
+
+Possible fields:
+
+gst
+sales_tax
+income_tax
+tv_fee
+njsurcharge
+fpa
+fuel_price_adjustment
+nepra_surcharge
+ed
+bank_charges
+late_payment_surcharge
+
+Any other tax or surcharge must be preserved in:
+
+tax_breakdown
+
+==================================================
+CHARGE BREAKDOWN
+==================================================
+
+Read the COMPLETE charges table.
+
+Every visible charge row must be preserved.
+
+Example:
+
+[
+    {
+        "label": "Electricity Charges",
+        "amount": 12345
+    },
+    {
+        "label": "GST",
+        "amount": 1234
+    }
+]
+
+If the bill has additional columns such as:
+
+units
+rate
+amount
+category
+description
+
+preserve them.
+
+Example:
+
+[
+    {
+        "description": "Energy Charges",
+        "units": 500,
+        "rate": 25.50,
+        "amount": 12750
+    }
+]
+
+==================================================
+PAYMENT INFORMATION
+==================================================
+
+Extract visible payment-related information.
+
+Preserve:
+
+payment_history
+
+and any other payment instructions in:
+
+additional_information
+
+==================================================
+ADJUSTMENTS
+==================================================
+
+Extract:
+
+adjustment
+discount
+security_deposit
+
+and preserve detailed adjustment rows in:
+
+adjustments
+
+==================================================
+OTHER CHARGES
+==================================================
+
+Extract all additional charges in:
+
+other_charges
+
+and:
+
+additional_charges
+
+==================================================
+BILL ITEMS
+==================================================
+
+If the bill contains an itemized list, preserve every visible row in:
+
+bill_items
+
+==================================================
+ADDITIONAL INFORMATION
+==================================================
+
+Any visible information that does not fit the named fields MUST NOT be discarded.
+
+Put it inside:
+
+additional_information
+
+Possible examples:
+
+- complaint number
+- helpline
+- bank/payment instructions
+- meter status
+- detection notes
+- government instructions
+- billing notes
+- subsidy
+- special remarks
+- category information
+- office information
+- service information
+- printed warnings
+- payment instructions
+- any other visible text
+
+==================================================
+OUTPUT
+==================================================
+
+Return exactly ONE JSON object.
+
+Use this structure:
 
 {
+    "utility_provider": null,
+    "bill_type": null,
+
     "consumer_name": null,
+    "father_or_husband_name": null,
     "reference_number": null,
     "consumer_id": null,
+    "account_number": null,
+    "bill_number": null,
+    "meter_number": null,
+
     "area_name": null,
+    "bill_address": null,
     "tariff_category": null,
+    "connection_type": null,
+    "phase": null,
+    "feeder": null,
+    "subdivision": null,
+    "division": null,
+    "circle": null,
+
     "bill_month": null,
     "bill_year": null,
+    "billing_period": null,
+    "billing_days": null,
+    "connection_date": null,
     "issue_date": null,
+    "reading_date": null,
     "due_date": null,
+
+    "previous_reading": null,
+    "present_reading": null,
+    "units_consumed": null,
+    "meter_multiplying_factor": null,
+    "load": null,
+    "sanctioned_load": null,
+    "connected_load": null,
+
     "payable_before_due": null,
     "payable_after_due": null,
     "current_bill": null,
     "arrears": null,
-    "previous_reading": null,
-    "present_reading": null,
-    "units_consumed": null
+    "previous_balance": null,
+    "current_charges": null,
+    "electricity_charges": null,
+
+    "gst": null,
+    "sales_tax": null,
+    "income_tax": null,
+    "tv_fee": null,
+    "njsurcharge": null,
+    "fpa": null,
+    "fuel_price_adjustment": null,
+    "nepra_surcharge": null,
+    "ed": null,
+    "bank_charges": null,
+
+    "meter_rent": null,
+    "security_deposit": null,
+    "adjustment": null,
+    "discount": null,
+    "late_payment_surcharge": null,
+
+    "total_amount": null,
+    "total_payable": null,
+
+    "meter_readings": [],
+    "reading_history": [],
+    "consumption_history": [],
+
+    "tariff_details": [],
+    "charge_breakdown": [],
+    "tax_breakdown": [],
+    "payment_history": [],
+    "adjustments": [],
+    "other_charges": [],
+    "bill_items": [],
+    "additional_charges": [],
+
+    "additional_information": {}
 }
 
---------------------------------------------------
-CONSUMER INFORMATION
---------------------------------------------------
+FINAL REQUIREMENT:
 
-consumer_name
-- Extract the consumer/customer name exactly as printed.
-- Preserve spelling.
-- Do not guess.
+Inspect the entire uploaded document before producing the JSON.
 
-reference_number
-- Extract the complete reference number.
-- Copy every digit exactly.
-- Do not shorten, insert, remove, or invent digits.
-- Do not add formatting unless it is part of the printed value.
+Do not stop after reading the first section.
 
-consumer_id
-- Extract the consumer ID / customer ID / consumer number when clearly identified.
-- Copy the complete value exactly as printed.
-- Do not confuse it with the reference number.
-- If no distinct consumer ID exists, return null.
-
-area_name
-- Extract the area/locality associated with the consumer/service.
-- Possible sources include Area, Locality, Sub Division, Subdivision, Division, Circle, Region, Feeder, Office, Sub Office, or the locality portion of the service address.
-- Return only the useful area/locality name.
-- Do not return the complete address, city, province, or country.
-
-Examples:
-GulBahar
-Saddar
-Wazir Bagh
-Hayatabad
-
-If the area cannot be identified, return null.
-
-tariff_category
-- Extract the tariff category exactly as printed.
-- Examples may include Domestic (A-1b(03)T), A-1, A-2, Commercial, Industrial, etc.
-- Do not infer a tariff category from the consumer name or area.
-- Return null if it is not clearly visible.
-
---------------------------------------------------
-BILL INFORMATION
---------------------------------------------------
-
-bill_month
-- Return the bill month as a number only.
-January=1, February=2, March=3, April=4, May=5, June=6,
-July=7, August=8, September=9, October=10, November=11, December=12.
-- If the bill only shows a textual month, convert it to the corresponding number.
-
-bill_year
-- Return the four-digit bill year only.
-
-issue_date
-- Extract the bill issue date / date of issue / billing date when clearly identified.
-- Preserve the date as printed, preferably in a simple readable format such as DD Mon YYYY.
-- Do not confuse issue date with due date.
-
-Due date may be printed as Due Date, Last Date, or similar.
-
-due_date
-- Extract the exact due date.
-- Preserve the date as printed, preferably in a simple readable format such as DD Mon YYYY.
-
-payable_before_due
-- Extract the amount payable before the due date.
-- This may be labelled Amount Payable Within Due Date, Payable Before Due Date, Amount Payable, or similar.
-- Return a numeric value only.
-- Remove Rs, PKR, commas, and spaces.
-
-payable_after_due
-- Extract the amount payable after the due date.
-- This may be labelled Amount Payable After Due Date or similar.
-- Return a numeric value only.
-- Remove Rs, PKR, commas, and spaces.
-
-current_bill
-- Extract the current bill/current charges amount when clearly identified.
-- Do not automatically use payable-before-due as current_bill.
-- Return a numeric value only.
-
-arrears
-- Extract arrears / previous balance / outstanding previous amount when clearly identified.
-- Return a numeric value only.
-- If the bill clearly shows zero arrears, return 0.
-- If arrears are not shown, return null.
-
---------------------------------------------------
-METER READINGS
---------------------------------------------------
-
-previous_reading
-- Extract the previous meter reading.
-- Return numeric value only.
-
-present_reading
-- Extract the present/current meter reading.
-- Return numeric value only.
-
-units_consumed
-- Extract total units consumed / units used.
-- Return numeric value only.
-- Do not include Units, kWh, commas, or spaces.
-- Do not calculate this value if the bill already provides it.
-- Only use the visible bill value.
-
---------------------------------------------------
-ACCURACY RULES
---------------------------------------------------
-
-1. Never guess or hallucinate.
-2. Never calculate a missing value from another field.
-3. Never confuse reference number with consumer ID.
-4. Never confuse current bill with payable amount.
-5. Never confuse previous reading with present reading.
-6. Use only information visible on the uploaded bill.
-7. If a field is missing or unreadable, return null.
-8. Return valid JSON only.
 PROMPT;
     }
 }

@@ -4,23 +4,24 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\OCR\ComparisonBillOCRService;
+use App\Services\ComparisonBillService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Throwable;
 
 class ComparisonBillOCRController extends Controller
 {
-    protected ComparisonBillOCRService $ocrService;
-
-    public function __construct(ComparisonBillOCRService $ocrService)
-    {
-        $this->ocrService = $ocrService;
+    public function __construct(
+        protected ComparisonBillOCRService $ocrService,
+        protected ComparisonBillService $comparisonBillService
+    ) {
     }
 
     /**
-     * Process a bill uploaded from the AC/DC Comparison page.
+     * Process and save a bill for the separate AC/DC Comparison flow.
      *
-     * This endpoint is intentionally separate from /bills/process-ocr.
+     * IMPORTANT: This is intentionally independent from the existing
+     * /bills/process-ocr WAPDA Bill Management OCR.
      */
     public function process(Request $request): JsonResponse
     {
@@ -34,23 +35,29 @@ class ComparisonBillOCRController extends Controller
         ]);
 
         try {
-            $result = $this->ocrService->extract(
-                $request->file('bill_file')
-            );
+            $file = $request->file('bill_file');
+
+            $result = $this->ocrService->extract($file);
 
             if (!$result['success']) {
                 return response()->json([
                     'success' => false,
-                    'message' => $result['message'],
+                    'message' => $result['message'] ?? 'Comparison bill OCR failed.',
                     'errors' => $result['response'] ?? null,
                 ], 400);
             }
 
+            $record = $this->comparisonBillService->createFromOCR(
+                $result['data'],
+                $file,
+                $request->user()
+            );
+
             return response()->json([
                 'success' => true,
-                'message' => 'Comparison bill OCR completed successfully.',
-                'data' => $result['data'],
-            ], 200);
+                'message' => 'Comparison bill OCR completed and saved successfully.',
+                'data' => $record,
+            ], 201);
         } catch (Throwable $exception) {
             report($exception);
 

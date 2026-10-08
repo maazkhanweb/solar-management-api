@@ -46,99 +46,6 @@ class BillAnalysisService
 
         /*
         |------------------------------------------------------------------
-        | Unit Rate
-        |------------------------------------------------------------------
-        */
-
-        $unitRate = 0;
-
-        if ($unitsConsumed > 0) {
-
-            $unitRate =
-                $billAmount /
-                $unitsConsumed;
-
-        }
-
-
-        /*
-        |------------------------------------------------------------------
-        | Solar Coverage
-        |------------------------------------------------------------------
-        */
-
-        $coverage = 0;
-
-        if ($unitsConsumed > 0) {
-
-            $coverage =
-                (
-                    $generatedUnits /
-                    $unitsConsumed
-                ) * 100;
-
-        }
-
-
-        /*
-        |------------------------------------------------------------------
-        | WAPDA Dependency
-        |------------------------------------------------------------------
-        */
-
-        $dependency = max(
-            0,
-            100 - $coverage
-        );
-
-
-        /*
-        |------------------------------------------------------------------
-        | Estimated Saving
-        |------------------------------------------------------------------
-        */
-
-        $estimatedSaving =
-            $generatedUnits *
-            $unitRate;
-
-
-        /*
-        |------------------------------------------------------------------
-        | Efficiency
-        |------------------------------------------------------------------
-        */
-
-        if ($coverage >= 100) {
-
-            $efficiency =
-                "Excellent";
-
-        } elseif ($coverage >= 90) {
-
-            $efficiency =
-                "Very Good";
-
-        } elseif ($coverage >= 80) {
-
-            $efficiency =
-                "Good";
-
-        } elseif ($coverage >= 60) {
-
-            $efficiency =
-                "Average";
-
-        } else {
-
-            $efficiency =
-                "Poor";
-
-        }
-
-
-        /*
-        |------------------------------------------------------------------
         | Response
         |------------------------------------------------------------------
         */
@@ -176,33 +83,6 @@ class BillAnalysisService
                         $billAmount,
                         2
                     ),
-
-                "unit_rate" =>
-                    round(
-                        $unitRate,
-                        2
-                    ),
-
-                "solar_coverage" =>
-                    round(
-                        $coverage,
-                        2
-                    ),
-
-                "wapda_dependency" =>
-                    round(
-                        $dependency,
-                        2
-                    ),
-
-                "estimated_saving" =>
-                    round(
-                        $estimatedSaving,
-                        2
-                    ),
-
-                "efficiency" =>
-                    $efficiency,
 
                 "generation_loss_reason" =>
                     $generationLossReason,

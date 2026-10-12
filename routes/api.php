@@ -369,16 +369,23 @@ Route::middleware('auth:sanctum')->group(function () {
     );
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Existing Bill Analysis
-    |--------------------------------------------------------------------------
-    */
+    
+/*
+|--------------------------------------------------------------------------
+| Existing Bill Analysis
+|--------------------------------------------------------------------------
+*/
 
-    Route::get(
-        '/bill-analysis',
-        [BillAnalysisController::class, 'index']
-    );
+Route::get(
+    '/bill-analysis',
+    [BillAnalysisController::class, 'index']
+);
+
+Route::get(
+    '/bills/{bill}/analysis',
+    [BillAnalysisController::class, 'analyze']
+);
+
 
 
     /*
@@ -390,6 +397,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get(
         '/reports',
         [ReportController::class, 'index']
+    );
+
+    Route::get(
+        '/reports/export/csv/{module}',
+        [ReportController::class, 'exportCsv']
+    );
+
+    Route::get(
+        '/reports/export/pdf/{module}',
+        [ReportController::class, 'exportPdf']
     );
 
 });

@@ -337,19 +337,19 @@ class ReportExportService
                                     /*
                                     | Solar Coverage
                                     */
-                                    $analysis["solar_coverage"] . "%",
+                                    ($analysis["solar_coverage"] ?? "-") . (isset($analysis["solar_coverage"]) ? "%" : ""),
 
                                     
 
                                     /*
                                     | Estimated Saving
                                     */
-                                    $analysis["estimated_saving"],
+                                    ($analysis["estimated_saving"] ?? "-"),
 
                                     /*
                                     | Efficiency
                                     */
-                                    $analysis["efficiency"],
+                                    ($analysis["efficiency"] ?? "-"),
 
                                     /*
                                     | Generation Loss Reason

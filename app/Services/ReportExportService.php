@@ -471,10 +471,9 @@ class ReportExportService
         */
         if ($module === "bills") {
 
-            $pdf->setPaper(
-                "a4",
-                "landscape"
-            );
+            // WAPDA Bill report has 10 columns, so use A4 landscape.
+            // The bills view also keeps each bill's details and analysis together.
+            $pdf->setPaper("A4", "landscape");
         }
 
         $fileName =

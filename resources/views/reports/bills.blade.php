@@ -98,12 +98,24 @@
 
     }
 
+    /*
+     * Keep one bill's details and solar analysis together on the same page.
+     * This prevents a bill heading/table header from being stranded at the
+     * bottom of one page while its data row starts on the next page.
+     */
+    .bill-report-record {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
 </style>
 
 
 @if($rows->count() > 0)
 
     @foreach($rows as $bill)
+
+        <div class="bill-report-record">
 
         @php
 
@@ -316,6 +328,8 @@
 
 
         <hr class="report-divider">
+
+        </div>
 
     @endforeach
 

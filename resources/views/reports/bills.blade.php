@@ -6,13 +6,13 @@
 
     .report-section-title {
 
-        font-size: 16px;
+        font-size: 14px;
 
         font-weight: bold;
 
-        margin-top: 18px;
+        margin-top: 14px;
 
-        margin-bottom: 8px;
+        margin-bottom: 6px;
 
         color: #164e63;
 
@@ -22,9 +22,11 @@
 
         width: 100%;
 
+        table-layout: fixed;
+
         border-collapse: collapse;
 
-        margin-bottom: 15px;
+        margin-bottom: 12px;
 
     }
 
@@ -34,23 +36,40 @@
 
         color: white;
 
-        font-size: 9px;
+        font-size: 7px;
 
-        padding: 6px;
+        padding: 4px 3px;
 
         text-align: left;
+
+        overflow-wrap: break-word;
 
     }
 
     .summary-table td {
 
-        font-size: 9px;
+        font-size: 7px;
 
-        padding: 6px;
+        padding: 4px 3px;
 
         border: 1px solid #d1d5db;
 
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+
     }
+
+    /* Compact column widths for the ten-column bill table on A4 portrait. */
+    .summary-table th:nth-child(1), .summary-table td:nth-child(1) { width: 4%; }
+    .summary-table th:nth-child(2), .summary-table td:nth-child(2) { width: 19%; }
+    .summary-table th:nth-child(3), .summary-table td:nth-child(3) { width: 15%; }
+    .summary-table th:nth-child(4), .summary-table td:nth-child(4) { width: 12%; }
+    .summary-table th:nth-child(5), .summary-table td:nth-child(5) { width: 7%; }
+    .summary-table th:nth-child(6), .summary-table td:nth-child(6) { width: 7%; }
+    .summary-table th:nth-child(7), .summary-table td:nth-child(7) { width: 9%; }
+    .summary-table th:nth-child(8), .summary-table td:nth-child(8) { width: 10%; }
+    .summary-table th:nth-child(9), .summary-table td:nth-child(9) { width: 7%; }
+    .summary-table th:nth-child(10), .summary-table td:nth-child(10) { width: 10%; }
 
     .analysis-table {
 
@@ -58,7 +77,7 @@
 
         border-collapse: collapse;
 
-        margin-bottom: 18px;
+        margin-bottom: 12px;
 
     }
 

@@ -12,9 +12,6 @@ class AuthController extends Controller
 {
     protected AuthService $authService;
 
-    /**
-     * Constructor
-     */
     public function __construct(AuthService $authService)
     {
         $this->authService = $authService;
@@ -25,9 +22,11 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse
     {
-        $response = $this->authService->login($request->validated());
+        $response = $this->authService->login(
+            $request->validated()
+        );
 
-        if (!$response['success']) {
+        if (empty($response['success'])) {
             return response()->json($response, 401);
         }
 
@@ -39,49 +38,49 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $response = $this->authService->logout($request->user());
+        $response = $this->authService->logout(
+            $request->user()
+        );
 
         return response()->json($response, 200);
     }
 
     /**
-     * Logged In User
+     * Get Logged-in User
      */
     public function me(Request $request): JsonResponse
-{
-    $user = $request->user()->load('area');
+    {
+        $authenticatedUser = $request->user();
 
-    return response()->json([
+        if (!$authenticatedUser) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
 
-        'success' => true,
+        $user = $authenticatedUser->loadMissing('area');
 
-        'user' => [
+        return response()->json([
+            'success' => true,
 
-            'id' => $user->id,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'role' => $user->role,
+                'status' => $user->status,
+                'last_login' => $user->last_login,
+                'area_id' => $user->area_id,
 
-            'name' => $user->name,
-
-            'email' => $user->email,
-
-            'phone' => $user->phone,
-
-            'role' => $user->role,
-
-            'status' => $user->status,
-
-            'last_login' => $user->last_login,
-
-            'area_id' => $user->area_id,
-
-            'area' => $user->area
-                ? [
-                    'id' => $user->area->id,
-                    'area_name' => $user->area->area_name,
-                ]
-                : null,
-
-        ],
-
-    ]);
-}
+                'area' => $user->area
+                    ? [
+                        'id' => $user->area->id,
+                        'area_name' => $user->area->area_name,
+                    ]
+                    : null,
+            ],
+        ], 200);
+    }
 }

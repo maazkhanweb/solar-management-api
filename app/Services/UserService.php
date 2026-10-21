@@ -19,6 +19,7 @@ class UserService
                 'id',
                 'name',
                 'email',
+                'google_id', // Used internally to identify Google-created accounts.
                 'phone',
                 'area_id',
                 'role',

@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\InventoryTransactionController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Middleware\EnsureManagementUser;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +28,8 @@ Route::post(
     '/login',
     [AuthController::class, 'login']
 );
+
+Route::post('/auth/google', [GoogleAuthController::class, 'signIn']);
 
 
 /*
@@ -159,6 +163,10 @@ Route::middleware('auth:sanctum')->group(function () {
         [ComparisonBillController::class, 'destroy']
     );
 
+
+    // Public Google users may use comparison routes above, but all management
+    // APIs below are restricted on the server as well as in the UI.
+    Route::middleware(EnsureManagementUser::class)->group(function () {
 
     /*
     |--------------------------------------------------------------------------
@@ -408,5 +416,7 @@ Route::get(
         '/reports/export/pdf/{module}',
         [ReportController::class, 'exportPdf']
     );
+
+    });
 
 });

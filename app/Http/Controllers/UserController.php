@@ -175,6 +175,12 @@ class UserController extends Controller
     ): JsonResponse {
         $data = $request->validated();
 
+        // Google-linked accounts must remain Public User even if a client
+        // attempts to submit a different role.
+        if (!empty($user->google_id)) {
+            $data['role'] = 'Public User';
+        }
+
         if ($request->hasFile('profile_image')) {
             $data['profile_image'] = $request->file('profile_image');
         }

@@ -4,6 +4,7 @@ namespace App\Http\Requests\User;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use App\Models\User;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -60,10 +61,9 @@ class UpdateUserRequest extends FormRequest
                 'min:8',
             ],
 
-            'role' => [
-    'required',
-    'in:Administrator,Manager',
-],
+            'role' => $isGoogleUser
+                ? ['required', 'in:Public User']
+                : ['required', 'in:Administrator,Manager'],
 
             'status' => [
                 'required',

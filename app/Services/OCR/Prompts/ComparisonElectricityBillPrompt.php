@@ -169,6 +169,40 @@ Do NOT invent rows.
 If the bill contains reading dates, meter status, reading type, or other meter information, preserve those fields inside meter_readings.
 
 ==================================================
+NET METERING / TOU / SOLAR EXPORT
+==================================================
+
+Carefully inspect any net-metering, bi-directional meter, TOU, peak/off-peak,
+import/export, solar, distributed generation, or adjustment section.
+
+Extract the following fields ONLY when the corresponding value is explicitly
+printed and readable on the uploaded bill:
+
+total_import_units
+peak_units
+off_peak_units
+solar_export_units
+export_units
+units_exported
+net_billable_units
+net_metering_adjustment_units
+solar_system_capacity_kw
+solar_generation_units
+
+Important interpretation rules:
+- Import units are electricity supplied by the utility to the consumer.
+- Export units are electricity delivered from the consumer's system to the grid.
+- Export units are NOT the same as total solar generation.
+- Do not infer household direct solar consumption from the bill.
+- Do not infer solar system capacity unless it is printed on the bill.
+- Do not calculate net billable units unless the bill explicitly prints that
+  figure. The application may calculate import minus export separately and
+  must label it as a derived value.
+- Preserve separate peak and off-peak values exactly as printed.
+- If a value is absent or unreadable, return null. Never treat missing as zero.
+- Preserve all relevant meter register labels and values in meter_readings.
+
+==================================================
 CONSUMPTION HISTORY
 ==================================================
 
@@ -409,6 +443,17 @@ Use this structure:
     "present_reading": null,
     "units_consumed": null,
     "meter_multiplying_factor": null,
+
+    "total_import_units": null,
+    "peak_units": null,
+    "off_peak_units": null,
+    "solar_export_units": null,
+    "export_units": null,
+    "units_exported": null,
+    "net_billable_units": null,
+    "net_metering_adjustment_units": null,
+    "solar_system_capacity_kw": null,
+    "solar_generation_units": null,
     "load": null,
     "sanctioned_load": null,
     "connected_load": null,
@@ -420,6 +465,7 @@ Use this structure:
     "previous_balance": null,
     "current_charges": null,
     "electricity_charges": null,
+    "total_taxes": null,
 
     "gst": null,
     "sales_tax": null,
